@@ -79,6 +79,7 @@ class StaffProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, limit_choices_to={'role': 'STAFF'})
     staff_role = models.CharField(max_length=20, choices=StaffRoles.choices)
     daily_rate = models.DecimalField(max_digits=10, decimal_places=2, help_text="Salary per day for payroll calculation.")
+    assigned_property = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True, blank=True, related_name='staff_members')
     joining_date = models.DateField()
 
     def __str__(self):
@@ -104,6 +105,7 @@ class Property(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     address = models.TextField()
+    owner = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='owned_properties', limit_choices_to={'role': 'SUPERADMIN'})
     manager = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_properties', limit_choices_to={'role': 'MANAGER'})
     
     # USP 13: Hygiene Scorecard - Public Display
@@ -145,6 +147,20 @@ class Room(models.Model):
     def __str__(self):
         return f"{self.property.name} - Room {self.room_number}"
 
+class PricingRule(models.Model):
+    """
+    Dynamic pricing rules for seasonal or demand-based rent adjustments.
+    Covers: USP 4 (Dynamic Pricing Engine)
+    """
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='pricing_rules')
+    rule_name = models.CharField(max_length=100, help_text="e.g., Summer Surge")
+    start_month = models.IntegerField(choices=[(i, i) for i in range(1, 13)], help_text="1=January, 12=December")
+    end_month = models.IntegerField(choices=[(i, i) for i in range(1, 13)])
+    price_multiplier = models.DecimalField(max_digits=3, decimal_places=2, help_text="e.g., 1.10 for 10% increase")
+    
+    def __str__(self):
+        return f"{self.rule_name} ({self.price_multiplier}x)"
+
 class Bed(models.Model):
     """
     The smallest bookable unit in a room.
@@ -166,6 +182,22 @@ class Bed(models.Model):
     def __str__(self):
         return f"{self.room} - Bed {self.bed_label}"
 
+class ElectricityReading(models.Model):
+    """
+    IoT meter readings for individual bed energy consumption.
+    Covers: USP 5 (Smart Electricity Billing)
+    """
+    bed = models.ForeignKey(Bed, on_delete=models.CASCADE, related_name='electricity_readings')
+    meter_id = models.CharField(max_length=50)
+    reading_kwh = models.DecimalField(max_digits=10, decimal_places=2)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        indexes = [models.Index(fields=['meter_id', 'timestamp'])]
+
+    def __str__(self):
+        return f"{self.meter_id} - {self.reading_kwh} units"
+
 class Asset(models.Model):
     """
     Manages physical assets like ACs, geysers, etc.
@@ -182,6 +214,21 @@ class Asset(models.Model):
 
     def __str__(self):
         return f"{self.name} in {self.property.name}"
+
+class AssetServiceLog(models.Model):
+    """
+    History of all services/repairs done on an asset.
+    Covers: Advanced Feature 4 (Asset & Inventory) - 'Scan history'
+    """
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='service_logs')
+    service_date = models.DateField()
+    cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    description = models.TextField(help_text="Details of repair or service")
+    serviced_by = models.CharField(max_length=100, help_text="Vendor or Staff name")
+    bill_photo = models.ImageField(upload_to='asset_bills/', null=True, blank=True)
+    
+    def __str__(self):
+        return f"Service for {self.asset.name} on {self.service_date}"
 ```
 
 ---
@@ -208,7 +255,7 @@ class Booking(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.PROTECT, related_name='bookings', limit_choices_to={'role': 'TENANT'})
-    bed = models.OneToOneField('properties.Bed', on_delete=models.PROTECT, related_name='booking')
+    bed = models.ForeignKey('properties.Bed', on_delete=models.PROTECT, related_name='bookings')
     
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
@@ -297,6 +344,7 @@ class Transaction(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     description = models.CharField(max_length=255)
     payment_gateway_txn_id = models.CharField(max_length=100, null=True, blank=True)
+    invoice = models.ForeignKey(Invoice, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions', help_text="Linked invoice if this txn pays a bill.")
 
     def __str__(self):
         return f"{self.get_category_display()} of {self.amount} for {self.user.username}"
@@ -372,6 +420,20 @@ class Notice(models.Model):
 
     def __str__(self):
         return self.title
+
+class ChatLog(models.Model):
+    """
+    Logs interactions between students and the AI Chatbot.
+    Covers: USP 14 (AI Chatbot)
+    """
+    tenant = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'TENANT'})
+    message = models.TextField(help_text="User's question")
+    bot_response = models.TextField(help_text="AI's answer")
+    intent = models.CharField(max_length=50, null=True, blank=True, help_text="Detected intent e.g., 'rent_query'")
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Chat by {self.tenant.username} at {self.timestamp}"
 ```
 
 ---
@@ -460,6 +522,7 @@ class Lead(models.Model):
     phone_number = models.CharField(max_length=15)
     email = models.EmailField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
+    converted_tenant = models.OneToOneField('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='lead_record', help_text="Linked tenant profile if converted.")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -901,6 +964,20 @@ class PropertySubscription(models.Model):
 
     def __str__(self):
         return f"{self.owner.username} - {self.plan.name}"
+
+class AppVersion(models.Model):
+    """
+    Manages app versions for forced updates.
+    Covers: Technical Feature 5 (Version Control & App Updates)
+    """
+    platform = models.CharField(max_length=10, choices=[('ANDROID', 'Android'), ('IOS', 'iOS')])
+    version_code = models.IntegerField(help_text="e.g., 102")
+    version_name = models.CharField(max_length=20, help_text="e.g., 1.0.2")
+    is_mandatory = models.BooleanField(default=False, help_text="Force update required?")
+    release_date = models.DateField()
+    
+    def __str__(self):
+        return f"{self.platform} - {self.version_name}"
 ```
 
 ---
