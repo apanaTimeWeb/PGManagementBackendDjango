@@ -2,14 +2,14 @@
 
 ## 1. INTRODUCTION
 
-Ye documentation **Smart PG Management System** ke liye hai, jisme **6 independent Django apps** ka detailed description diya gaya hai. Ye apps modular monolith architecture follow karti hain with **12 Django models** across different apps.
+Ye documentation **Smart PG Management System** ke liye hai, jisme **18 independent Django apps** ka detailed description diya gaya hai. Ye apps modular monolith architecture follow karti hain with **39+ Django models** across different apps.
 
 ### 1.1 Project Overview
 - **Architecture Type**: Modular Monolith Architecture (Django)
-- **Total Apps**: 6 (+ 1 Core Settings)
-- **Total Models**: 12 database models
+- **Total Apps**: 17 Feature Apps + 1 Core Settings
+- **Total Models**: 35+ database models
 - **Communication**: Direct Python Imports (Synchronous)
-- **Database**: PostgreSQL/SQLite (single database)
+- **Database**: PostgreSQL (single database)
 - **Authentication**: JWT-based
 - **Language**: Python 3.10+ with Django 4.2+
 
@@ -43,13 +43,24 @@ Beginners ke liye Microservices banana mushkil hota hai (Network issues, Docker,
 
 ## MODULAR MONOLITH ARCHITECTURE OVERVIEW
 
-### App Distribution (6 Apps, 12 Models)
-1. **User Management App** (`apps/users`): CustomUser, TenantProfile (2 models)
-2. **Property & Inventory App** (`apps/inventory`): Room, Bed (2 models)
-3. **Booking Management App** (`apps/bookings`): Booking (1 model)
-4. **Finance Management App** (`apps/finance`): Invoice, WalletTransaction (2 models)
-5. **Operations & Safety App** (`apps/operations`): Complaint, EntryLog, HygieneRating (3 models)
-6. **Smart Mess App** (`apps/mess`): MessMenu, DailyMealSelection (2 models)
+### App Distribution (17 Feature Apps)
+1. **User Management** (`apps/users`): CustomUser, TenantProfile, StaffProfile
+2. **Property Service** (`apps/properties`): Property, Room, Bed, PricingRule, Asset
+3. **Booking Service** (`apps/bookings`): Booking, DigitalAgreement
+4. **Finance Service** (`apps/finance`): Invoice, Transaction, Expense
+5. **Operations Service** (`apps/operations`): Complaint, EntryLog, Notice, ChatLog
+6. **Smart Mess** (`apps/mess`): MessMenu, DailyMealSelection
+7. **CRM & Leads** (`apps/crm`): Lead
+8. **Notifications** (`apps/notifications`): NotificationLog, FCMToken
+9. **Visitor Management** (`apps/visitors`): VisitorRequest
+10. **Inventory (Stock)** (`apps/inventory`): InventoryItem, InventoryTransaction
+11. **Payroll** (`apps/payroll`): StaffAttendance, SalaryPayment
+12. **Hygiene** (`apps/hygiene`): HygieneInspection
+13. **Feedback** (`apps/feedback`): ComplaintFeedback, MessFeedback
+14. **Audit Logs** (`apps/audit`): AuditLog
+15. **Alumni Network** (`apps/alumni`): AlumniProfile, JobReferral
+16. **SaaS Management** (`apps/saas`): SubscriptionPlan, PropertySubscription, AppVersion
+17. **Reports** (`apps/reports`): GeneratedReport
 
 ### Django Project Structure
 ```
@@ -60,16 +71,22 @@ smart_pg_backend/
 │   └── wsgi.py
 ├── apps/
 │   ├── users/              # App 1: Authentication & User Management
-│   │   ├── models.py       # CustomUser, TenantProfile
-│   │   ├── views.py        # API views
-│   │   ├── serializers.py  # DRF serializers
-│   │   ├── urls.py         # App URLs
-│   │   └── services.py     # Business logic
-│   ├── inventory/          # App 2: Rooms & Beds
+│   ├── properties/         # App 2: Property & Assets
 │   ├── bookings/           # App 3: Booking Lifecycle
 │   ├── finance/            # App 4: Money & Wallet
 │   ├── operations/         # App 5: Complaints & Safety
-│   └── mess/               # App 6: Smart Food System
+│   ├── mess/               # App 6: Smart Food System
+│   ├── crm/                # App 7: Leads
+│   ├── notifications/      # App 8: Alerts
+│   ├── visitors/           # App 9: Gate Entry
+│   ├── inventory/          # App 10: Kitchen Stock
+│   ├── payroll/            # App 11: Staff Salaries
+│   ├── hygiene/            # App 12: Inspection
+│   ├── feedback/           # App 13: Ratings
+│   ├── audit/              # App 14: Logs
+│   ├── alumni/             # App 15: Alumni
+│   ├── saas/               # App 16: Subscription
+│   └── reports/            # App 17: Analytics
 ├── requirements.txt
 └── manage.py
 ```
@@ -294,22 +311,23 @@ GET /api/v1/auth/internal/tenant-profile/{user_id}/
 
 ---
 
-## APP 2: PROPERTY & INVENTORY SERVICE (`apps/inventory`)
+## APP 2: PROPERTY SERVICE (`apps/properties`)
 
-### Models: Room, Bed
-Property management mein rooms, beds, aur inventory tracking ke features shamil hain.
+### Models: Property, Room, Bed, PricingRule, Asset, ElectricityReading
+Property management handles branches (multi-property), rooms, beds, assets, and IoT integration.
 
 #### 2.1 Room Management
 **List Rooms**  
-**Endpoint**: GET /api/v1/inventory/rooms/  
+**Endpoint**: GET /api/v1/properties/rooms/  
 **Description**: Available rooms ki list with filters.  
 
 **Query Parameters**:
 ```
-?floor=2&has_ac=true&capacity=2&available=true
+?floor=2&has_ac=true&capacity=2&available=true&property_id=uuid
 ```
 
 **Database Interaction**:
+- **Property Table**: Validation
 - **Room Table**: Filters ke according rooms fetch
 - **Bed Table**: Room ke beds count aur availability check
 
@@ -335,68 +353,22 @@ Property management mein rooms, beds, aur inventory tracking ke features shamil 
 ```
 
 #### 2.2 Live Vacant Bed Link (USP 3)
-**Endpoint**: GET /api/v1/inventory/public/bed/{public_uid}/  
+**Endpoint**: GET /api/v1/properties/public/bed/{public_uid}/  
 **Description**: Public link se bed details without login.  
 
-**URL Example**: `https://smartpg.com/api/v1/inventory/public/bed/550e8400-e29b-41d4-a716-446655440020/`
-
-**Database Interaction**:
-- **Bed Table**: public_uid se bed search
-- **Room Table**: Bed ki room details fetch
+**URL Example**: `https://smartpg.com/api/v1/properties/public/bed/550e8400-e29b-41d4-a716-446655440020/`
 
 **Business Logic**:
 ```python
-# apps/inventory/views.py
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-
+# apps/properties/views.py
 @api_view(['GET'])
 def get_bed_by_public_link(request, public_uid):
-    try:
-        bed = Bed.objects.select_related('room').get(public_uid=public_uid)
-        
-        if bed.is_occupied:
-            return Response({
-                'success': False,
-                'message': 'Sorry, this bed is already booked'
-            }, status=400)
-        
-        return Response({
-            'success': True,
-            'bed': {
-                'id': bed.id,
-                'bed_label': bed.bed_label,
-                'room': {
-                    'room_number': bed.room.room_number,
-                    'floor': bed.room.floor,
-                    'has_ac': bed.room.has_ac,
-                    'current_rent': bed.room.current_seasonal_rent
-                }
-            }
-        })
-    except Bed.DoesNotExist:
-        return Response({'error': 'Bed not found'}, status=404)
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "bed": {
-    "id": "550e8400-e29b-41d4-a716-446655440020",
-    "bed_label": "A",
-    "room": {
-      "room_number": "204-B",
-      "floor": 2,
-      "has_ac": true,
-      "current_rent": "9000.00"
-    }
-  }
-}
+    bed = Bed.objects.select_related('room', 'room__property').get(public_uid=public_uid)
+    return Response({...})
 ```
 
 #### 2.3 Smart Electricity Meter (USP 5)
-**Endpoint**: POST /api/v1/inventory/iot/meter-reading/  
+**Endpoint**: POST /api/v1/properties/iot/meter-reading/  
 **Description**: IoT devices se electricity readings receive karta hai.  
 
 **Request Body**:
@@ -408,75 +380,47 @@ def get_bed_by_public_link(request, public_uid):
 }
 ```
 
-**Database Interaction**:
-- **Bed Table**: meter_id se bed find karo
-- Update `last_meter_reading` aur `current_meter_reading`
-
 **Business Logic**:
 ```python
-# apps/inventory/services.py
-from django.utils import timezone
-
+# apps/properties/services.py
 def update_meter_reading(meter_id, current_reading, timestamp):
-    try:
-        bed = Bed.objects.get(iot_meter_id=meter_id)
-        
-        # Update readings
-        bed.last_meter_reading = bed.current_meter_reading
-        bed.current_meter_reading = current_reading
-        bed.save()
-        
-        # Calculate usage for billing
-        usage = current_reading - bed.last_meter_reading
-        
-        # Trigger billing calculation if needed
-        if usage > 0:
-            from apps.finance.services import calculate_electricity_bill
-            calculate_electricity_bill(bed, usage)
-        
-        return True
-    except Bed.DoesNotExist:
-        return False
+    bed = Bed.objects.get(iot_meter_id=meter_id)
+    ElectricityReading.objects.create(
+        bed=bed, meter_id=meter_id, reading_kwh=current_reading
+    )
+    # Trigger billing if needed
 ```
 
 #### 2.4 Dynamic Pricing Engine (USP 4)
-**Endpoint**: PUT /api/v1/inventory/rooms/{room_id}/pricing/  
-**Description**: Seasonal pricing update (Admin only).  
-
-**Request Body**:
-```json
-{
-  "season": "PEAK",
-  "multiplier": 1.2
-}
-```
+**Endpoint**: PUT /api/v1/properties/rooms/{room_id}/pricing/  
+**Description**: Seasonal pricing update via `PricingRule`.  
 
 **Business Logic**:
 ```python
-# apps/inventory/services.py
-def update_seasonal_pricing(room_id, season, multiplier):
-    room = Room.objects.get(id=room_id)
-    
-    if season == 'PEAK':  # June-July
-        room.current_seasonal_rent = room.base_rent * multiplier
-    elif season == 'LOW':  # Winter months
-        room.current_seasonal_rent = room.base_rent * 0.8
-    else:  # Normal season
-        room.current_seasonal_rent = room.base_rent
-    
-    room.save()
-    return room
+# apps/properties/services.py
+def apply_pricing_rule(property_id, rule_name, multiplier):
+    # Apply multiplier to all rooms in property
+    pass
 ```
 
-#### 2.5 Internal APIs for Other Apps
+#### 2.5 Asset Management (Advanced Feature 4)
+**Endpoint**: POST /api/v1/properties/assets/scan/  
+**Description**: QR code scan karke asset details aur service history fetch karna.
+
+**Response**:
+```json
+{
+  "asset": "Voltas AC",
+  "next_service": "2025-12-01",
+  "service_history": [...]
+}
+```
+
+#### 2.6 Internal APIs for Other Apps
 ```python
 # For booking app to check availability
-GET /api/v1/inventory/internal/bed/{bed_id}/availability/
-PUT /api/v1/inventory/internal/bed/{bed_id}/occupy/
-PUT /api/v1/inventory/internal/bed/{bed_id}/vacate/
-
-# For finance app to get meter readings
-GET /api/v1/inventory/internal/bed/{bed_id}/meter-reading/
+GET /api/v1/properties/internal/bed/{bed_id}/availability/
+PUT /api/v1/properties/internal/bed/{bed_id}/occupy/
 ```
 
 ---
@@ -557,120 +501,52 @@ def create_booking(user, validated_data):
 ```
 
 #### 3.2 Digital Agreement (USP 7)
-**Upload Agreement**  
-**Endpoint**: POST /api/v1/bookings/{booking_id}/agreement/upload/  
-**Description**: Digital agreement upload aur eSign.  
+**Endpoint**: POST /api/v1/bookings/{booking_id}/agreement/  
+**Description**: Generates and stores agreement.
 
-**Request**: Multipart form with PDF file
+**Database Interaction**:
+- **DigitalAgreement Table**: Stores file path and signature status.
+- **Booking Table**: Linked OneToOne.
 
-**Sign Agreement**  
-**Endpoint**: POST /api/v1/bookings/{booking_id}/agreement/sign/  
-**Description**: Digital signature capture.  
-
-**Business Logic**:
 ```python
 # apps/bookings/services.py
-def sign_agreement(booking_id, signature_data):
-    booking = Booking.objects.get(id=booking_id)
-    
-    # Process digital signature
-    booking.is_signed_digitally = True
-    booking.save()
-    
-    # Generate signed PDF (integrate with eSign service)
-    # Store final signed document
-    
-    return booking
+def generate_agreement(booking):
+    # Create PDF
+    agreement = DigitalAgreement.objects.create(
+        booking=booking,
+        agreement_file='path/to/pdf',
+        is_signed=False
+    )
+    return agreement
 ```
 
 #### 3.3 Digital Notice Period & Auto Refund (USP 9)
 **Request Exit**  
 **Endpoint**: POST /api/v1/bookings/{booking_id}/request-exit/  
-**Description**: Student exit request with automatic refund calculation.  
-
-**Request Body**:
-```json
-{
-  "exit_reason": "Course completed",
-  "preferred_exit_date": "2025-12-31"
-}
-```
+**Description**: Student exit request.
 
 **Business Logic**:
 ```python
 # apps/bookings/services.py
-from datetime import date, timedelta
-
 def request_exit(booking_id, exit_reason):
     booking = Booking.objects.get(id=booking_id)
-    
-    # Set notice date
     booking.notice_given_date = date.today()
-    booking.status = 'NOTICE'
-    
-    # Calculate exit date (30 days notice)
-    booking.end_date = date.today() + timedelta(days=30)
+    # Logic to calculate refund_amount
     booking.save()
-    
-    # Trigger final bill calculation
-    from apps.finance.services import generate_final_bill
-    final_bill = generate_final_bill(booking)
-    
-    # Calculate refund amount
-    refund_amount = calculate_refund(booking)
-    
-    return {
-        'booking': booking,
-        'final_bill': final_bill,
-        'refund_amount': refund_amount
-    }
-
-def calculate_refund(booking):
-    # Calculate unused rent, deposit refund, etc.
-    # Complex business logic for refund calculation
-    pass
 ```
 
-#### 3.4 Get User Bookings
-**Endpoint**: GET /api/v1/bookings/my-bookings/  
-**Description**: Current user ke sabhi bookings.  
-
-**Response**:
-```json
-{
-  "success": true,
-  "bookings": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440030",
-      "bed": {
-        "room_number": "204-B",
-        "bed_label": "A"
-      },
-      "start_date": "2025-12-01",
-      "end_date": null,
-      "status": "ACTIVE",
-      "rent_amount": "9000.00"
-    }
-  ]
-}
-```
-
-#### 3.5 Internal APIs for Other Apps
+#### 3.4 Internal APIs for Other Apps
 ```python
 # For finance app to get booking details
-GET /api/v1/bookings/internal/user/{user_id}/active-booking/
 GET /api/v1/bookings/internal/booking/{booking_id}/
-
-# For operations app to verify tenant
-GET /api/v1/bookings/internal/verify-tenant/{user_id}/{bed_id}/
 ```
 
 ---
 
-## APP 4: FINANCE MANAGEMENT SERVICE (`apps/finance`)
+## APP 4: FINANCE SERVICE (`apps/finance`)
 
-### Models: Invoice, WalletTransaction
-Finance management mein invoicing, payments, wallet, aur credit score ke features shamil hain.
+### Models: Invoice, Transaction, Expense
+Finance management handles invoices, all transactions (wallet/payment gateway), and operational expenses.
 
 #### 4.1 Auto Invoice Generation
 **Trigger**: Monthly cron job (1st of every month)  
@@ -736,38 +612,42 @@ def generate_monthly_invoices():
 }
 ```
 
+#### 4.2 Transaction Handler
 **Recharge Wallet**  
 **Endpoint**: POST /api/v1/finance/wallet/recharge/  
-**Description**: Wallet mein paisa add karna.  
-
-**Request Body**:
-```json
-{
-  "amount": "1000.00",
-  "payment_method": "UPI",
-  "transaction_id": "TXN123456789"
-}
-```
+**Description**: Creates a credit transaction.  
 
 **Business Logic**:
 ```python
 # apps/finance/services.py
-def recharge_wallet(user, amount, payment_method, transaction_id):
-    # Update wallet balance
-    tenant_profile = user.tenant_profile
-    tenant_profile.wallet_balance += amount
-    tenant_profile.save()
-    
-    # Create transaction record
-    WalletTransaction.objects.create(
+def recharge_wallet(user, amount, txn_id):
+    Transaction.objects.create(
         user=user,
         amount=amount,
-        txn_type='CREDIT',
-        category='RECHARGE',
-        timestamp=timezone.now()
+        is_credit=True,
+        category='WALLET_RECHARGE',
+        payment_gateway_txn_id=txn_id
     )
-    
-    return tenant_profile.wallet_balance
+    # Update profile balance
+```
+
+#### 4.3 Expense Tracking (Advanced Feature 2)
+**Endpoint**: POST /api/v1/finance/expenses/add/  
+**Description**: Log property expenses.
+
+**Database Interaction**:
+- **Expense Table**: Stores category, amount, receipt.
+
+```python
+# apps/finance/services.py
+def log_expense(property_id, category, amount, description, receipt):
+    Expense.objects.create(
+        property_id=property_id,
+        category=category,
+        amount=amount,
+        description=description,
+        receipt=receipt
+    )
 ```
 
 #### 4.3 Credit Score System (USP 10)
@@ -827,11 +707,12 @@ def pay_invoice(invoice_id, user, payment_method, amount):
         tenant_profile.save()
         
         # Create transaction
-        WalletTransaction.objects.create(
+        Transaction.objects.create(
             user=user,
             amount=amount,
-            txn_type='DEBIT',
-            category='RENT'
+            is_credit=False,
+            category='RENT_PAYMENT',
+            invoice=invoice
         )
     
     # Mark invoice as paid
@@ -860,10 +741,10 @@ POST /api/v1/finance/internal/process-fine/
 
 ---
 
-## APP 5: OPERATIONS & SAFETY SERVICE (`apps/operations`)
+## APP 5: OPERATIONS SERVICE (`apps/operations`)
 
-### Models: Complaint, EntryLog, HygieneRating
-Operations mein complaints, entry logging, hygiene tracking, aur safety features shamil hain.
+### Models: Complaint, EntryLog, Notice, ChatLog
+Operations handle complaints, gate entry, digital notices, and AI chat.
 
 #### 5.1 Complaint Management
 **Submit Complaint**  
@@ -1044,13 +925,32 @@ def send_parent_alert(user, timestamp):
 }
 ```
 
-#### 5.5 Internal APIs for Other Apps
+#### 5.4 Digital Notice Board (Advanced Feature 7)
+**Endpoint**: GET /api/v1/operations/notices/  
+**Description**: Fetch active notices.
+
+```python
+# apps/operations/services.py
+def get_active_notices(property_id):
+    return Notice.objects.filter(property_id=property_id, is_published=True)
+```
+
+#### 5.5 AI Chatbot (ChatLog)
+**Endpoint**: POST /api/v1/operations/chat/  
+**Description**: USP 14 - AI Bot logs.
+
+```python
+# apps/operations/services.py
+def log_chat(user, message, response, intent):
+    ChatLog.objects.create(
+        tenant=user, message=message, bot_response=response, intent=intent
+    )
+```
+
+#### 5.6 Internal APIs for Other Apps
 ```python
 # For users app to verify entry permissions
 GET /api/v1/operations/internal/verify-access/{user_id}/
-
-# For finance app to log fine-related entries
-POST /api/v1/operations/internal/log-fine/
 ```
 
 ---
@@ -1281,6 +1181,371 @@ GET /api/v1/mess/internal/meal-feedback/{date}/
 
 ---
 
+## APP 7: CRM & LEAD MANAGEMENT (`apps/crm`)
+
+### Models: Lead
+CRM app potential leads aur inquiries ko track karta hai. Yeh multi-property compatible hai.
+
+#### 7.1 Capture Lead
+**Create New Enquiry**  
+**Endpoint**: POST /api/v1/crm/leads/  
+**Description**: Manager ya Website se nayi enquiry aayi hai.
+
+**Request Body**:
+```json
+{
+  "property_id": "uuid-of-property",
+  "full_name": "Rohan Das",
+  "phone_number": "9876543210",
+  "email": "rohan@gmail.com",
+  "status": "NEW",
+  "notes": "Looking for AC room"
+}
+```
+
+**Business Logic**:
+```python
+# apps/crm/services.py
+def create_lead(data):
+    # Check if lead already exists
+    if Lead.objects.filter(phone_number=data['phone_number'], property=data['property_id']).exists():
+        raise ValidationError("Lead already exists for this property.")
+    
+    lead = Lead.objects.create(**data)
+    # Trigger notification to Manager
+    NotificationService.send_manager_alert(f"New Lead: {lead.full_name}")
+    return lead
+```
+
+#### 7.2 Lead Follow-up
+**Update Lead Status**  
+**Endpoint**: PATCH /api/v1/crm/leads/{lead_id}/  
+**Description**: Lead se baat hone ke baad status update karna.
+
+**Request Body**:
+```json
+{
+  "status": "VISITED",
+  "notes": "Visited today, liked Room 101. Will decide tomorrow."
+}
+```
+
+---
+
+## APP 8: NOTIFICATIONS (`apps/notifications`)
+
+### Models: NotificationLog, FCMToken
+Centralized notification system jo SMS, WhatsApp, aur Push Notifications manage karta hai.
+
+#### 8.1 Register Device
+**Register FCM Token**  
+**Endpoint**: POST /api/v1/notifications/device/register/  
+**Description**: Mobile app khulte hi device token bhejna.
+
+**Request Body**:
+```json
+{
+  "token": "fcm-token-xyz-123",
+  "device_type": "ANDROID"
+}
+```
+
+#### 8.2 Internal Internal Service (Not Exposed directly)
+**Send Alert**
+```python
+# apps/notifications/services.py
+def send_notification(user, title, message, type='PUSH'):
+    # 1. Store in DB
+    log = NotificationLog.objects.create(
+        user=user,
+        title=title,
+        message=message,
+        notification_type=type
+    )
+    
+    # 2. Integrate Third Party
+    if type == 'PUSH':
+        fcm_tokens = user.fcm_tokens.filter(is_active=True)
+        FirebaseAdapter.send_multicast(tokens=fcm_tokens, title=title, body=message)
+    elif type == 'WHATSAPP':
+        WhatsAppAdapter.send_msg(phone=user.phone_number, text=message)
+```
+
+---
+
+## APP 9: VISITOR MANAGEMENT (`apps/visitors`)
+
+### Models: VisitorRequest
+Gatekeeper system. Koi anjaan aadmi bina approval ke andar nahi aa sakta.
+
+#### 9.1 Tenant Verification
+**Request/Approve Entry**  
+**Endpoint**: POST /api/v1/visitors/request/  
+**Description**: Guard gate par visitor ki photo lega aur request bhejega.
+
+**Request Body**:
+```json
+{
+  "tenant_id": "uuid-of-tenant",
+  "visitor_name": "Delivery Boy",
+  "visitor_phone": "9988776655",
+  "purpose": "Zomato Delivery",
+  "photo": "base64-image-string"
+}
+```
+
+**Response (To Guard App)**:  
+"Waiting for Tenant Approval..."
+
+#### 9.2 Tenant Action
+**Approve/Reject Visitor**  
+**Endpoint**: POST /api/v1/visitors/request/{request_id}/action/  
+**Description**: Tenant apne room se approve karega.
+
+**Request Body**:
+```json
+{
+  "action": "APPROVED"
+}
+```
+
+---
+
+## APP 10: INVENTORY (STOCK) (`apps/inventory`)
+
+### Models: InventoryItem, InventoryTransaction
+Kitchen aur Housekeeping ka stock manage karna.
+
+#### 10.1 Stock Management
+**Add Stock (Purple)**  
+**Endpoint**: POST /api/v1/inventory/stock/add/  
+**Description**: Naya rashan ya cleaning material buy kiya.
+
+**Request Body**:
+```json
+{
+  "property_id": "uuid",
+  "item_name": "Atta (Wheat Flour)",
+  "quantity": 50,
+  "unit": "KG",
+  "price": 2000
+}
+```
+
+#### 10.2 Consumption
+**Daily Consumption Log**  
+**Endpoint**: POST /api/v1/inventory/stock/consume/  
+**Description**: Cook ne 5kg Atta use kiya.
+
+**Request Body**:
+```json
+{
+  "item_id": "uuid-item",
+  "quantity": 5,
+  "type": "CONSUMPTION"
+}
+```
+**Effect**: `current_quantity` kam ho jayegi. Agar threshold se neeche gayi toh Manager ko alert jayega.
+
+---
+
+## APP 11: PAYROLL (`apps/payroll`)
+
+### Models: StaffAttendance, SalaryPayment
+Staff (Cook, Guard, Cleaner) ki salary aur attendance.
+
+#### 11.1 Attendance
+**Mark Attendance**  
+**Endpoint**: POST /api/v1/payroll/attendance/mark/  
+**Description**: Biometric ya Selfie attendance.
+
+**Request Body**:
+```json
+{
+  "staff_id": "uuid",
+  "status": "PRESENT",
+  "selfie": "url/photo.jpg",
+  "location": "lat,long"
+}
+```
+
+#### 11.2 Salary Generation
+**Generate Monthly Salary**  
+**Endpoint**: POST /api/v1/payroll/generate/  
+**Description**: Mahine ke end mein automatic calculation.
+
+**Response**:
+```json
+{
+  "staff_name": "Ramu Kaka",
+  "days_worked": 28,
+  "daily_rate": 500,
+  "gross_salary": 14000,
+  "deductions": 0,
+  "net_salary": 14000
+}
+```
+
+---
+
+## APP 12: HYGIENE (`apps/hygiene`)
+
+### Models: HygieneInspection
+PG ko saaf rakhne ka daily checklist system.
+
+#### 12.1 Daily Inspection
+**Submit Inspection Report**  
+**Endpoint**: POST /api/v1/hygiene/inspect/  
+**Description**: Manager daily round lagayega aur score dega.
+
+**Request Body**:
+```json
+{
+  "property_id": "uuid",
+  "cleanliness_score": 9,
+  "kitchen_score": 8,
+  "bathroom_score": 7,
+  "photos": ["url1.jpg", "url2.jpg"]
+}
+```
+
+**Calculation**:
+`Overall Rating = Average(All Scores)` -> Displayed on Public Website as USP.
+
+---
+
+## APP 13: FEEDBACK (`apps/feedback`)
+
+### Models: ComplaintFeedback, MessFeedback
+Continuous improvement system.
+
+#### 13.1 Mess Feedback
+**Rate Today's Meal**  
+**Endpoint**: POST /api/v1/feedback/mess/rate/  
+**Description**: Student khana khane ke baad rating dega.
+
+**Request Body**:
+```json
+{
+  "menu_id": "uuid",
+  "meal_type": "LUNCH",
+  "rating": 5,
+  "comment": "Paneer was tasty!"
+}
+```
+
+#### 13.2 Complaint Feedback
+**Rate Service**  
+**Endpoint**: POST /api/v1/feedback/complaint/rate/  
+**Description**: Jab ticket close ho.
+"How was the service provided by the plumber?" (1-5 Stars).
+
+---
+
+## APP 14: AUDIT (`apps/audit`)
+
+### Models: AuditLog
+Security aur transparency ke liye 'Black Box'.
+
+#### 14.1 Log Activity (Internal)
+**Description**: System har critical action ko record karega.
+
+**Model Structure**:
+- `user`: Who did it?
+- `action`: What happened? (DELETE, UPDATE)
+- `model`: Which object? (Payment, Room)
+- `changes`: `{"old_val": 5000, "new_val": 0}`
+
+**Usage**:
+Agar Manager cash payment delete karta hai, toh AuditLog mein pakda jayega.
+
+---
+
+## APP 15: ALUMNI (`apps/alumni`)
+
+### Models: AlumniProfile, JobReferral
+PG chhodne ke baad ka engagement.
+
+#### 15.1 Job Board
+**Get Referrals**  
+**Endpoint**: GET /api/v1/alumni/jobs/  
+**Description**: Alumni dwara post ki gayi jobs.
+
+**Response**:
+```json
+[
+  {
+    "company": "Google",
+    "role": "Software Engineer",
+    "posted_by": "Ex-Tenant Rahul",
+    "contact": "LinkedIn URL"
+  }
+]
+```
+
+---
+
+## APP 16: SAAS MANAGEMENT (`apps/saas`)
+
+### Models: SubscriptionPlan, PropertySubscription, AppVersion
+Super-Super Admin controls.
+
+#### 16.1 Manage Plans
+**List Plans**  
+**Endpoint**: GET /api/v1/saas/plans/  
+**Response**:
+```json
+[
+  { "name": "Basic", "price": 999, "max_properties": 1 },
+  { "name": "Gold", "price": 4999, "max_properties": 5 }
+]
+```
+
+#### 16.2 App Version Check
+**Force Update**  
+**Endpoint**: GET /api/v1/saas/version-check/?platform=ANDROID  
+**Response**:
+```json
+{
+  "latest_version": 105,
+  "force_update": true,
+  "message": "Please update app to continue."
+}
+```
+
+---
+
+## APP 17: REPORTS (`apps/reports`)
+
+### Models: GeneratedReport
+Data export for analysis.
+
+#### 17.1 Generate Report
+**Endpoint**: POST /api/v1/reports/generate/  
+**Description**: Request specific report generation (Async Task).
+
+**Request Body**:
+```json
+{
+  "report_type": "MONTHLY_RENT",
+  "start_date": "2025-01-01",
+  "end_date": "2025-01-31"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Report generation started. You will be notified.",
+  "task_id": "xyz-123"
+}
+```
+
+---
+
+
+
 ## 🔗 INTER-APP COMMUNICATION (Modular Monolith Advantage)
 
 Microservices mein humein HTTP API calls karni padti hain, lekin modular monolith mein hum **direct Python imports** use karte hain.
@@ -1323,11 +1588,11 @@ def book_meal_complete_flow(user, date, meal_type, status):
     tenant_profile.save()
     
     # Step 5: Create transaction log (finance app)
-    WalletTransaction.objects.create(
+    Transaction.objects.create(
         user=user,
-        amount=menu.price_lunch,
-        txn_type='DEBIT',
-        category='MESS'
+        amount=amount,
+        is_credit=False,
+        category='MESS_MEAL'
     )
     
     return selection
@@ -1346,10 +1611,10 @@ def deduct_from_wallet(user, amount, category):
     tenant_profile.wallet_balance -= amount
     tenant_profile.save()
     
-    WalletTransaction.objects.create(
+    Transaction.objects.create(
         user=user,
         amount=amount,
-        txn_type='DEBIT',
+        is_credit=False,
         category=category
     )
     
@@ -1455,15 +1720,29 @@ if not success:
    - Implement wallet integration
    - Add meal analytics
 
-### Phase 4: Operations & Safety (Week 7-8)
+### Phase 4: Operations & Mess (Week 7-8)
 7. **App 5: Operations**
-   - Create `Complaint`, `EntryLog`, `HygieneRating` models
-   - Build complaint management system
-   - Implement entry logging with alerts (USP 12)
-   - Add WhatsApp bot integration (USP 14)
+   - Create `Complaint`, `EntryLog`, `Notice`, `ChatLog` models
+   - Build complaint system & AI Bot
+   - Implement digital notice board
 
-8. **Integration & Testing**
+8. **App 6: Smart Mess**
+   - Create `MessMenu`, `DailyMealSelection` models
+   - Build pay-per-day meal booking
+
+### Phase 5: Additional Services (Week 9-12)
+9. **CRM, Notifications, Visitors**
+   - Implement lead tracking, alert system, gate entry
+
+10. **Inventory, Payroll, Hygiene**
+    - Manage stock, staff salaries, compliance
+
+11. **Feedback, Audit, Alumni, SaaS, Reports**
+    - Complete the ecosystem with analytics and community features
+
+12. **Integration & Testing**
    - Test inter-app communication
+
    - Implement error handling
    - Add comprehensive logging
    - Performance optimization
@@ -1473,16 +1752,27 @@ if not success:
 
 ## 📋 MODELS DISTRIBUTION SUMMARY
 
-**Total**: 12 models across 6 Django apps
+**Total**: 39+ models across 18 Django apps
 
 | App | Models Count | Models |
 |-----|--------------|--------|
-| User Management | 2 | CustomUser, TenantProfile |
-| Property & Inventory | 2 | Room, Bed |
-| Booking Management | 1 | Booking |
-| Finance Management | 2 | Invoice, WalletTransaction |
-| Operations & Safety | 3 | Complaint, EntryLog, HygieneRating |
+| User Management | 3 | CustomUser, TenantProfile, StaffProfile |
+| Property Service | 6 | Property, Room, Bed, PricingRule, Asset, ElectricityReading |
+| Booking Service | 2 | Booking, DigitalAgreement |
+| Finance Service | 3 | Invoice, Transaction, Expense |
+| Operations Service | 4 | Complaint, EntryLog, Notice, ChatLog |
 | Smart Mess | 2 | MessMenu, DailyMealSelection |
+| CRM | 1 | Lead |
+| Notifications | 2 | NotificationLog, FCMToken |
+| Visitors | 1 | VisitorRequest |
+| Inventory (Stock) | 2 | InventoryItem, InventoryTransaction |
+| Payroll | 2 | StaffAttendance, SalaryPayment |
+| Hygiene | 1 | HygieneInspection |
+| Feedback | 2 | ComplaintFeedback, MessFeedback |
+| Audit | 1 | AuditLog |
+| Alumni | 2 | AlumniProfile, JobReferral |
+| SaaS | 3 | SubscriptionPlan, PropertySubscription, AppVersion |
+| Reports | 1 | GeneratedReport |
 
 ---
 
