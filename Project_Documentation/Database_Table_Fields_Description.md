@@ -83,6 +83,27 @@ Ye module decide karta hai ki login karne wala insaan **Malik (Admin)** hai, **S
       - **Why (USP 6)**: AI Matching ke liye data. Hum alag-alag columns nahi banayenge (smoker, drinker, late\_sleeper etc.), balki ek JSON mein sab store karenge flexibility ke liye.
       - **Example**: `{"sleep_time": "2AM", "food": "Veg", "music": "Loud"}`
 
+#### 1.3 Table: `StaffProfile`
+
+**Description**: Cook, Guard, Cleaner details.
+**Fields**:
+
+  - `user_id` (Foreign Key -> CustomUser)
+      - **Why**: Link to main User table.
+      - **Example**: `Cook's user_id`
+  - `staff_role` (Enum: COOK, GUARD, CLEANER, OTHER)
+      - **Why**: Job profile.
+      - **Example**: `COOK`
+  - `daily_rate` (Decimal)
+      - **Why**: Salary calculation basis.
+      - **Example**: `500.00`
+  - `assigned_property_id` (Foreign Key -> Property)
+      - **Why**: Where they work.
+      - **Example**: `Property UUID`
+  - `joining_date` (Date)
+      - **Why**: HR records.
+      - **Example**: `2025-01-01`
+
 -----
 
 ## 🛏️ MODULE 2: PROPERTY & INVENTORY (App: `inventory`)
@@ -90,6 +111,33 @@ Ye module decide karta hai ki login karne wala insaan **Malik (Admin)** hai, **S
 ### Purpose: Dukaan ka Maal (Rooms & Beds)
 
 Hamein pata hona chahiye ki hamare paas bechne ke liye kya hai.
+
+#### 2.0 Table: `Property`
+
+**Description**: Represents a PG branch.
+**Fields**:
+
+  - `id` (UUID, Primary Key)
+      - **Why**: Unique ID for each PG branch.
+      - **Example**: `property_uuid`
+  - `name` (String)
+      - **Why**: Name of the PG.
+      - **Example**: `"Gokuldham PG 1"`
+  - `address` (Text)
+      - **Why**: Physical location.
+      - **Example**: `"123, Main Road, Kota"`
+  - `owner_id` (Foreign Key -> CustomUser)
+      - **Why**: Mulitple owners support.
+      - **Example**: `Owner's user_id`
+  - `manager_id` (Foreign Key -> CustomUser, Nullable)
+      - **Why**: Assigned manager.
+      - **Example**: `Manager's user_id`
+  - `current_hygiene_rating` (Decimal)
+      - **Why (USP 13)**: Public hygiene score.
+      - **Example**: `4.5`
+  - `preferred_language` (Enum: EN, HI, TE)
+      - **Why**: For staff app localization.
+      - **Example**: `HI`
 
 #### 2.1 Table: `Room`
 
@@ -139,6 +187,77 @@ Hamein pata hona chahiye ki hamare paas bechne ke liye kya hai.
       - **Why**: Simple status check. Agar `True` hai, toh naya banda book nahi kar sakta.
       - **Example**: `False` (Available)
 
+#### 2.3 Table: `PricingRule`
+
+**Description**: Seasonal pricing logic.
+**Fields**:
+
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Rules are per property.
+  - `rule_name` (String)
+      - **Why**: Identify the rule.
+      - **Example**: `"Summer Surge"`
+  - `start_month` (Integer)
+      - **Why**: When does it start (1-12).
+      - **Example**: `4` (April)
+  - `end_month` (Integer)
+      - **Why**: When does it end.
+      - **Example**: `6` (June)
+  - `price_multiplier` (Decimal)
+      - **Why (USP 4)**: Rent multiplier. 1.10 means 10% extra.
+      - **Example**: `1.10`
+
+#### 2.4 Table: `ElectricityReading`
+
+**Description**: IoT meter logs.
+**Fields**:
+
+  - `bed_id` (Foreign Key -> Bed)
+      - **Why**: Which bed consumed power.
+  - `meter_id` (String)
+      - **Why**: IoT Device ID.
+  - `reading_kwh` (Decimal)
+      - **Why**: Units consumed.
+      - **Example**: `12.5`
+  - `timestamp` (DateTime)
+      - **Why**: When was reading taken.
+
+#### 2.5 Table: `Asset`
+
+**Description**: Physical assets (AC, Geyser).
+**Fields**:
+
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Where is the asset.
+  - `room_id` (Foreign Key -> Room, Nullable)
+      - **Why**: Which room (if applicable).
+  - `name` (String)
+      - **Why**: What is it.
+      - **Example**: `"Voltas AC 1.5T"`
+  - `qr_code` (String)
+      - **Why**: Scan for history.
+  - `purchase_date` (Date)
+      - **Why**: Warranty tracking.
+  - `next_service_due_date` (Date)
+      - **Why**: Maintenance alerts.
+
+#### 2.6 Table: `AssetServiceLog`
+
+**Description**: Repair history.
+**Fields**:
+
+  - `asset_id` (Foreign Key -> Asset)
+      - **Why**: Which item fixed.
+  - `service_date` (Date)
+      - **Why**: When.
+  - `cost` (Decimal)
+      - **Why**: Expense tracking.
+  - `description` (Text)
+      - **Why**: What was done.
+      - **Example**: `"Gas filling"`
+  - `bill_photo` (Image)
+      - **Why**: Proof.
+
 -----
 
 ## 👨‍🎓 MODULE 3: TENANT LIFECYCLE (App: `bookings`)
@@ -175,6 +294,20 @@ Kaun, Kahan, aur Kab tak reh raha hai.
       - **Why**: Booking ka current status track karne ke liye. WAITING_FOR_LOAN_APPROVAL zero deposit feature ke liye zaroori hai.
       - **Example**: `ACTIVE`
 
+#### 3.2 Table: `DigitalAgreement`
+
+**Description**: E-signed legal documents.
+**Fields**:
+
+  - `booking_id` (OneToOne -> Booking)
+      - **Why**: Link to specific stay.
+  - `agreement_file` (File)
+      - **Why (USP 7)**: The PDF file.
+  - `is_signed` (Boolean)
+      - **Why**: Status check.
+  - `signed_at` (DateTime)
+      - **Why**: Timestamp of sign.
+
 -----
 
 ## 💰 MODULE 4: FINANCE (App: `finance`)
@@ -207,7 +340,43 @@ Paisa kahan se aaya aur kahan gaya.
       - **Why**: Final amount jo student ko pay karna hai (Rent + Electricity + Mess + Late Fee - Discount).
       - **Example**: `8550.00`
 
-#### 4.2 Table: `WalletTransaction`
+      - **Example**: `8550.00`
+
+#### 4.2 Table: `Transaction`
+
+**Description**: Logs all financial movements (Rent, Wallet, Refunds, Expenses).
+**Fields**:
+
+  - `user_id` (Foreign Key -> CustomUser)
+      - **Why**: Who is involved.
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Which branch.
+  - `is_credit` (Boolean)
+      - **Why**: Money IN (True) or OUT (False).
+  - `category` (Enum: RENT, WALLET_RECHARGE, MESS, REFUND, EXPENSE, SALARY)
+      - **Why**: Type of money movement.
+  - `amount` (Decimal)
+      - **Why**: How much.
+  - `description` (String)
+      - **Why**: Details.
+  - `payment_gateway_txn_id` (String, Nullable)
+      - **Why**: Tracking with Razorpay/PhonePe.
+  - `invoice_id` (Foreign Key -> Invoice, Nullable)
+      - **Why**: Link to bill if paying rent.
+
+#### 4.3 Table: `Expense`
+
+**Description**: Operational costs.
+**Fields**:
+
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Branch expense.
+  - `category` (String)
+      - **Why**: Type (Groceries, Utilites).
+  - `amount` (Decimal)
+      - **Why**: Cost.
+  - `receipt` (File)
+      - **Why**: Proof for audit.
 
 **Description**: User ki Passbook. Har choti-badi transaction yahan record hogi.
 **Fields**:
@@ -268,6 +437,34 @@ Paisa kahan se aaya aur kahan gaya.
   - `is_late_entry` (Boolean)
       - **Why**: Baad mein report nikalne ke liye ki "Kaunsa student sabse zyada late aata hai".
       - **Example**: `True`
+
+#### 5.3 Table: `Notice`
+
+**Description**: Digital Notice Board.
+**Fields**:
+
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Which PG.
+  - `title` (String)
+      - **Why**: Headline.
+  - `body` (Text)
+      - **Why**: Message.
+  - `is_published` (Boolean)
+      - **Why**: Draft vs Live.
+
+#### 5.4 Table: `ChatLog`
+
+**Description**: AI Bot history.
+**Fields**:
+
+  - `tenant_id` (Foreign Key -> CustomUser)
+      - **Why**: Who asked.
+  - `message` (Text)
+      - **Why**: User question.
+  - `bot_response` (Text)
+      - **Why**: AI answer.
+  - `intent` (String)
+      - **Why**: What they wanted (e.g. `rent_query`).
 
 -----
 
@@ -878,6 +1075,21 @@ Agar aap ye software doosre PG owners ko bechenge.
   - `is_active` (Boolean)
       - **Why**: Plan abhi available hai ya nahi.
       - **Example**: `True`
+
+#### 16.3 Table: `AppVersion`
+
+**Description**: Force update logic.
+**Fields**:
+
+  - `platform` (Enum: ANDROID, IOS)
+      - **Why**: OS type.
+  - `version_code` (Integer)
+      - **Why**: Internal version (102).
+  - `version_name` (String)
+      - **Why**: Public version (1.0.2).
+  - `is_mandatory` (Boolean)
+      - **Why**: Force update?
+
 
 #### 16.2 Table: `PropertySubscription`
 
