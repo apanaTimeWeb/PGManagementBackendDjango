@@ -306,9 +306,25 @@ Kaun, Kahan, aur Kab tak reh raha hai.
   - `notice_given_date` (Date)
       - **Why (USP 9)**: Jab student app par "I am leaving" dabata hai, ye date save hoti hai. Iske basis par system calculate karega ki refund kab aur kitna dena hai.
       - **Example**: `2025-11-18`
+  - `refund_amount` (Decimal, Nullable)
+      - **Why (USP 9)**: Auto-calculated refund amount. System calculate karega: Deposit - Outstanding Dues - Damage Charges = Refund.
+      - **Example**: `14500.00` (₹16000 deposit minus ₹1500 pending dues)
+  - `refund_processed_date` (Date, Nullable)
+      - **Why (USP 9)**: Kab refund process hua. Ye timestamp proof hai ki paisa wapas bhej diya gaya.
+      - **Example**: `2025-11-20`
+  - `is_zero_deposit` (Boolean)
+      - **Why (USP 8)**: Zero deposit option liya ya nahi. True means fintech loan liya, false means normal deposit diya.
+      - **Example**: `True` (Fintech loan liya)
+  - `fintech_partner_name` (String, Nullable)
+      - **Why (USP 8)**: Kaunsi company se loan liya (e.g., "PayLater Finance", "ZestMoney"). Integration tracking ke liye.
+      - **Example**: `"PayLater Finance"`
+  - `fintech_loan_id` (String, Nullable)
+      - **Why (USP 8)**: Loan company ka transaction/loan ID. Agar student payment nahi karta toh loan company ko contact karne ke liye.
+      - **Example**: `"LOAN-2025-X99876"`
   - `status` (Enum)
       - **Why**: Booking ka current status track karne ke liye. WAITING_FOR_LOAN_APPROVAL zero deposit feature ke liye zaroori hai.
       - **Example**: `ACTIVE`
+      - **Choices**: ACTIVE, NOTICE_PERIOD, EXITED, CANCELLED
 
 #### 3.2 Table: `DigitalAgreement`
 
@@ -481,6 +497,88 @@ Paisa kahan se aaya aur kahan gaya.
       - **Why**: AI answer.
   - `intent` (String)
       - **Why**: What they wanted (e.g. `rent_query`).
+
+#### 5.5 Table: `SOSAlert`
+
+**Description**: Emergency SOS alert ka complete record. Jab student Panic Button dabayega, tab ye table use ho ki kya hua, kitni der mein response aaya, aur kaise resolve hua.
+**Fields**:
+
+  - `id` (UUID, Primary Key)
+      - **Why**: Har emergency incident ko uniquely identify karne ke liye.
+      - **Example**: `550e8400-e29b-41d4-a716-446655440070`
+  - `tenant_id` (Foreign Key -> CustomUser)
+      - **Why (USP 11)**: Kisne SOS button dabaya - student ka record.
+      - **Example**: `Rahul ka user_id`
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Kaunse PG mein emergency aayi hai - responders ko location pata chale.
+      - **Example**: `Gokuldham PG ka UUID`
+  - `latitude` (Decimal, Nullable)
+      - **Why**: Phone ka GPS location - exact position. Manager ko Google Maps mein dikhaenge.
+      - **Example**: `28.6139` (Delhi)
+  - `longitude` (Decimal, Nullable)
+      - **Why**: Longitude coordinate - latitude ke saath complete location.
+      - **Example**: `77.2090`
+  - `location_accuracy` (Integer, Nullable)
+      - **Why**: GPS kitna accurate hai (meters mein). 10 meters matlab bahut accurate, 100 meters matlab thoda dhundhla.
+      - **Example**: `15` (15 meter radius mein hai)
+  - `message` (Text, Blank allowed)
+      - **Why**: Student optional message type kar sakta hai emergency ke time (e.g., "Help me", "Fire").
+      - **Example**: `"Need immediate help"`
+  - `device_info` (JSON)
+      - **Why**: Kis phone se SOS aaya (Android/iOS), kaun sa app version - debugging ke liye zaroori.
+      - **Example**: `{"device": "Android", "app_version": "1.2.3"}`
+  - `status` (Enum: TRIGGERED, RESPONDING, RESOLVED, FALSE_ALARM)
+      - **Why**: Emergency ka current state kya hai.
+      - **Example**: `TRIGGERED` (Abhi abhi aaya)
+          - `TRIGGERED`: SOS button abhi-abhi dabaya gaya
+          - `RESPONDING`: Manager/Security respond kar rahe hain
+          - `RESOLVED`: Emergency khatam ho gayi
+          - `FALSE_ALARM`: Galti se dab gaya tha
+  - `triggered_at` (DateTime, Auto-generated)
+      - **Why**: Exactly kab SOS button dabaya gaya - time-critical information.
+      - **Example**: `2025-11-20T22:45:30Z`
+  - `acknowledged_at` (DateTime, Nullable)
+      - **Why**: Manager/Security ne kab dekha - response time calculate karne ke liye.
+      - **Example**: `2025-11-20T22:46:15Z` (45 seconds mein acknowledge kiya)
+  - `resolved_at` (DateTime, Nullable)
+      - **Why**: Incident kab resolve hua - complete timeline ke liye.
+      - **Example**: `2025-11-20T23:00:00Z`
+  - `response_time_seconds` (Integer, Nullable)
+      - **Why**: Kitni der mein first response aaya(seconds mein) - performance tracking ke liye.
+      - **Example**: `45` (45 seconds)
+      - **Calculation**: `acknowledged_at - triggered_at` (automatically calculated)
+  - `first_responder_id` (Foreign Key -> CustomUser, Nullable)
+      - **Why**: Sabse pehle kaunsa Manager/Guard respond kiya - credit tracking.
+      - **Example**: `Manager Rajesh ka user_id`
+  - `manager_notified` (Boolean)
+      - **Why**: Track karna ki Manager ko notification gayi ya nahi.
+      - **Example**: `True`
+  - `parent_notified` (Boolean)
+      - **Why (USP 1)**: Parents ko SMS/WhatsApp gaya ya nahi - Parent Portal ke liye.
+      - **Example**: `True`
+  - `security_notified` (Boolean)
+      - **Why**: Security guard ko alert gaya ya nahi.
+      - **Example**: `True`
+  - `owner_notified` (Boolean)
+      - **Why**: PG owner ko bhi bheja ya nahi (serious cases mein).
+      - **Example**: `False`
+  - `resolution_notes` (Text, Blank allowed)
+      - **Why**: Kaise resolve hui - detailed explanation. Manager baad mein fill karega.
+      - **Example**: `"False alarm - student accidentally pressed button"`
+  - `is_genuine_emergency` (Boolean,Nullable)
+      - **Why**: Sahi emergency thi ya galti se button dab gaya - False alarm tracking.
+      - **Example**: `False` (Galti se dab gaya)
+          - `True`: Real emergency thi
+          - `False`: False alarm
+          - `Null`: Abhi decide nahi hua
+
+**Status Flow**: TRIGGERED -> RESPONDING -> RESOLVED/FALSE_ALARM
+
+**Use Cases**:
+- Emergency response time analytics
+- Parent ko immediately location share
+- Safety incident reporting
+- False alarm prevention (agar bahut zyada false alarms hain toh warning)
 
 -----
 

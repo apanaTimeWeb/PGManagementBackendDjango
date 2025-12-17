@@ -178,6 +178,7 @@ class Bed(models.Model):
     bed_label = models.CharField(max_length=5, help_text="e.g., A, B, Upper, Lower")
     
     # USP 3: Live "Vacant Bed" Public Link
+    public_uid = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True, help_text="Public link UUID for sharing bed availability without login")
     is_occupied = models.BooleanField(default=False, db_index=True)
     
     # USP 5: Smart Electricity Billing (IoT)
@@ -397,6 +398,9 @@ class Complaint(models.Model):
     status = models.CharField(max_length=20, choices=[('OPEN', 'Open'), ('IN_PROGRESS', 'In Progress'), ('RESOLVED', 'Resolved')], default='OPEN')
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+    
+    # USP 14: AI Chatbot Integration
+    is_raised_by_bot = models.BooleanField(default=False, help_text="True if complaint was raised via WhatsApp AI Bot")
 
     def __str__(self):
         return f"Complaint #{self.id} by {self.tenant.username}"
@@ -441,6 +445,62 @@ class ChatLog(models.Model):
 
     def __str__(self):
         return f"Chat by {self.tenant.username} at {self.timestamp}"
+
+class SOSAlert(models.Model):
+    """
+    Emergency SOS alert tracking for tenant safety.
+    Covers: USP 11 (SOS Alert System)
+    """
+    class Status(models.TextChoices):
+        TRIGGERED = 'TRIGGERED', 'Triggered'
+        RESPONDING = 'RESPONDING', 'Manager Responding'
+        RESOLVED = 'RESOLVED', 'Resolved'
+        FALSE_ALARM = 'FALSE_ALARM', 'False Alarm'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey('users.CustomUser', on_delete=models.PROTECT, related_name='sos_alerts', limit_choices_to={'role': 'TENANT'})
+    property = models.ForeignKey('properties.Property', on_delete=models.PROTECT)
+    
+    # Location data
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="GPS latitude")
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="GPS longitude")
+    location_accuracy = models.IntegerField(null=True, blank=True, help_text="GPS accuracy in meters")
+    
+    # Alert details
+    message = models.TextField(blank=True, help_text="Optional emergency message from tenant")
+    device_info = models.JSONField(default=dict, blank=True, help_text="Device type, OS, app version")
+    
+    # Response tracking
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIGGERED)
+    triggered_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True, help_text="When manager/security acknowledged")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    response_time_seconds = models.IntegerField(null=True, blank=True, help_text="Time to first response in seconds")
+    
+    # Responders
+    first_responder = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='responded_sos_alerts', help_text="First person to respond to the alert")
+    
+    # Notifications sent
+    manager_notified = models.BooleanField(default=False)
+    parent_notified = models.BooleanField(default=False)
+    security_notified = models.BooleanField(default=False)
+    owner_notified = models.BooleanField(default=False)
+    
+    # Resolution
+    resolution_notes = models.TextField(blank=True, help_text="How incident was resolved")
+    is_genuine_emergency = models.BooleanField(null=True, blank=True, help_text="True if genuine, False if false alarm, Null if undetermined")
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant', 'triggered_at']),
+            models.Index(fields=['property', 'status']),
+            models.Index(fields=['triggered_at']),
+        ]
+        ordering = ['-triggered_at']
+    
+    def __str__(self):
+        return f"SOS Alert by {self.tenant.username} at {self.triggered_at}"
+
 ```
 
 ---
@@ -1095,15 +1155,15 @@ class TranslationString(models.Model):
 17. reports
 18. localization
 
-### **Total Models: 40+**
+### **Total Models: 41**
 
 | App | Models Count | Models |
 |-----|--------------|--------|
 | users | 3 | CustomUser, TenantProfile, StaffProfile |
-| properties | 6 | Property, Room, Bed, PricingRule, Asset, ElectricityReading, AssetServiceLog |
+| properties | 7 | Property, Room, Bed, PricingRule, Asset, ElectricityReading, AssetServiceLog |
 | bookings | 2 | Booking, DigitalAgreement |
 | finance | 3 | Invoice, Transaction, Expense |
-| operations | 4 | Complaint, EntryLog, Notice, ChatLog |
+| operations | 5 | Complaint, EntryLog, Notice, ChatLog, SOSAlert |
 | mess | 2 | MessMenu, DailyMealSelection |
 | crm | 1 | Lead |
 | notifications | 2 | NotificationLog, FCMToken |
