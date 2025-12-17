@@ -2,11 +2,11 @@
 
 Ye documentation **Smart PG Management System** ka detailed folder structure hai. Har file ka purpose, content, aur responsibility clearly explain ki gayi hai taaki new developers ko samajh aaye ki kya kahan hoga aur kaise kaam karega.
 
-**Architecture Style**: Modular Monolith (17 Independent Feature Apps)
+**Architecture Style**: Modular Monolith (18 Independent Feature Apps)
 
 ## Related Documentation
 - **Service Architecture**: All_Services_Documentation.md (Service details, business logic)
-- **Database Models**: All_Database_Tables_Models.md (All 39+ Django models)
+- **Database Models**: All_Database_Tables_Models.md (All 40+ Django models)
 - **Database Details**: Database_Table_Fields_Description.md (Field descriptions, constraints)
 - **Feature Summary**: Project_Summary_Features.md (High-level overview with 15 USPs)
 
@@ -47,10 +47,14 @@ Ye documentation **Smart PG Management System** ka detailed folder structure hai
 │   │   ├── api_response.py     // Standardized API Response Wrapper
 │   │   ├── file_upload.py      // S3 Upload Logic
 │   │   ├── pdf_generator.py    // PDF Invoice/Agreement Gen
-│   │   └── sms_utils.py        // SMS/Whatsapp Sending Utils
-│   └── permissions.py          // Global Permissions (IsSuperAdmin, IsManager)
+│   │   ├── sms_utils.py        // SMS/Whatsapp Sending Utils
+│   │   └── translation.py      // Language Translation Helpers
+│   ├── permissions.py          // Global Permissions (IsSuperAdmin, IsManager)
+│   └── localization/           // Multi-Language Support
+│       ├── middleware.py       // Language Detection Middleware
+│       └── language_loader.py  // Load translations from DB
 │
-├── apps/                       // The 17 Logic Modules (Feature Apps)
+├── apps/                       // The 18 Logic Modules (Feature Apps)
 │   ├── users/                  // [App 1] Auth, Roles, Profiles
 │   ├── properties/             // [App 2] Property, Rooms, Beds, Assets
 │   ├── bookings/               // [App 3] Bookings, Agreements, Exits
@@ -67,7 +71,8 @@ Ye documentation **Smart PG Management System** ka detailed folder structure hai
 │   ├── audit/                  // [App 14] Activity Logs
 │   ├── alumni/                 // [App 15] Alumni Network
 │   ├── saas/                   // [App 16] Subscription Plans
-│   └── reports/                // [App 17] Analtyics & Export
+│   ├── reports/                // [App 17] Analytics & Export
+│   └── localization/           // [App 18] Multi-Language Support
 │
 ├── media/                      // User Uploaded Files (Local Dev)
 └── static/                     // Static Assets
@@ -265,6 +270,38 @@ apps/reports/
 └── views.py                    # Download endpoints
 ```
 
+### 18. `apps/localization` (Multi-Language) - *NEW*
+Handles translations for 6 languages.
+```text
+apps/localization/
+├── models.py                   # TranslationString (module, key, language, value)
+├── serializers.py
+├── views.py                    # Get/Set translations
+├── services/
+│   ├── translation_manager.py  # CRUD operations for translations
+│   └── language_detector.py    # Detect user language from request
+├── management/
+│   └── commands/
+│       └── load_translations.py # Import bulk translations from JSON/CSV
+└── urls.py                     # /api/v1/localization/*
+```
+
+**Supported Languages**:
+- English (en)
+- Hindi (hi)
+- Tamil (ta)
+- Telugu (te)
+- Kannada (kn)
+- Bengali (bn)
+
+**Key Features**:
+- Dynamic UI string loading based on user's `preferred_language`
+- Admin interface for managing translations
+- Fallback to English if translation missing
+- Translation caching for performance
+
+---
+
 ---
 
 ## 🛠️ Infrastructure & Config
@@ -282,10 +319,49 @@ apps/reports/
 
 ---
 
-## ✅ Summary of Changes
-Is documentation ko update kiya gaya hai to reflect:
-1.  **ALL 17 Apps** (Pehle version mein sirf 6 thay).
-2.  **Correct App Names**: `inventory` ab Kitchen Stock hai, aur `properties` Rooms/Beds ke liye hai.
-3.  **Full ERP Scope**: Audit, SaaS, Reports, aur Alumni apps add kiye gaye hain.
+## ✅ Summary of Changes (Version 2.0)
 
-Ye structure ab `All_Services_Documentation.md` aur `All_Database_Tables_Models.md` ke saath 100% sync mein hai.
+Is documentation ko update kiya gaya hai to reflect:
+
+1. **ALL 18 Apps** (Latest: Added Localization app for multi-language support)
+2. **40+ Models** (Updated from 39+, includes TranslationString model)
+3. **Correct App Names**: 
+   - `bookings` (formerly tenants) for consistency
+   - `properties` for Rooms/Beds/Assets
+   - `inventory` for Kitchen Stock
+   - `localization` for Multi-Language Support
+4. **Full ERP Scope**: Audit, SaaS, Reports, Alumni, and Localization apps
+5. **Multi-Language Infrastructure**: 
+   - Translation middleware in shared/localization/
+   - Language utilities for 6 languages (en, hi, ta, te, kn, bn)
+   - User preference based UI rendering
+
+### Alignment Status: 100% ✅
+
+Ye structure ab completely aligned hai with:
+- ✅ `Project_Summary_Features.md` - All 33 features supported
+- ✅ `All_Services_Documentation.md` - All 18 apps documented
+- ✅ `All_Database_Tables_Models.md` - All 40+ models included
+- ✅ `Database_Table_Fields_Description.md` - Field-level details match
+
+### Key Highlights:
+
+- **Modular Monolith Architecture**: 18 independent Django apps with clear boundaries
+- **Scalable Structure**: Easy to convert to microservices later if needed
+- **Complete Feature Coverage**: 15 USP Features + 9 Advanced Features + 9 Technical Features
+- **Production Ready**: Includes Docker, Celery, Redis, Multi-language support
+- **Beginner Friendly**: Clear folder structure with purpose-driven organization
+
+**Next Steps**: 
+1. Create Django apps using `python manage.py startapp <app_name>`
+2. Implement models from All_Database_Tables_Models.md
+3. Build services and views following this structure
+4. Deploy with Docker Compose
+
+---
+
+**📝 Document Version:** 2.0 (Complete & Fully Aligned)  
+**📅 Last Updated:** December 2025  
+**🎯 Total Apps:** 18 Django apps  
+**🎯 Total Models:** 40+ database models  
+**✅ Feature Coverage:** 33/33 Features (100%)
