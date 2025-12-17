@@ -21,18 +21,13 @@ Ye documentation **Smart PG Management System** ka detailed folder structure hai
 ├── .gitignore                  // Git ignore file
 ├── requirements.txt            // All Python dependencies
 ├── manage.py                   // Django management script
-├── docker-compose.yml          // Docker setup (Django + Postgres + Redis + Celery)
+├── docker-compose.yml          // Docker setup (Django + MySQL + Redis + Celery)
 ├── Dockerfile                  // Docker build config
 ├── README.md                   // Project overview & setup
 │
 ├── core/                       // Project Core (Settings & Config)
 │   ├── __init__.py
-│   ├── settings/
-│   │   ├── __init__.py
-│   │   ├── base.py             // Base settings (Apps, Middleware, DB)
-│   │   ├── development.py      // Dev settings (Debug=True)
-│   │   ├── production.py       // Prod settings (Security, S3, Logging)
-│   │   └── testing.py          // Test runner settings
+│   ├── settings.py             // Django settings (Apps, Middleware, DB, All configs)
 │   ├── urls.py                 // Main URL Router (Includes all app URLs)
 │   ├── wsgi.py                 // WSGI (Sync)
 │   └── asgi.py                 // ASGI (Async for WebSockets)
@@ -306,13 +301,17 @@ apps/localization/
 
 ## 🛠️ Infrastructure & Config
 
-### `core/settings/`
-- **base.py**: Installed Apps = `['django.contrib...', 'rest_framework', 'apps.users', 'apps.properties', ..., 'apps.reports']`
-- **production.py**: `DEBUG = False`, `AWS_STORAGE_BUCKET_NAME = '...'`
+### `core/settings.py`
+- **Single Settings File**: Contains all configurations
+- **Installed Apps**: All 18 Django apps registered
+- **Database**: SQLite (development) / MySQL (production)
+- **Custom User Model**: `AUTH_USER_MODEL = 'users.CustomUser'`
+- **REST Framework**: API configuration
+- **Multi-language**: 6 languages supported
 
 ### `docker-compose.yml`
 - **web**: Django Gunicorn
-- **db**: PostgreSQL 15
+- **db**: MySQL 8.0
 - **redis**: Redis 7 (Caching/Celery)
 - **worker**: Celery Worker (Async Tasks)
 - **beat**: Celery Beat (Cron Jobs like Monthly Invoice)

@@ -9,7 +9,7 @@ Ye documentation **Smart PG Management System** ke liye hai, jisme **18 independ
 - **Total Apps**: 18 Feature Apps + 1 Core Settings
 - **Total Models**: 40+ database models
 - **Communication**: Direct Python Imports (Synchronous)
-- **Database**: PostgreSQL (single database)
+- **Database**: MySQL (single database)
 - **Authentication**: JWT-based
 - **Language**: Python 3.10+ with Django 4.2+
 - **Multi-Language Support**: English, Hindi, Tamil, Telugu, Kannada, Bengali
@@ -17,7 +17,7 @@ Ye documentation **Smart PG Management System** ke liye hai, jisme **18 independ
 ### 1.2 Technology Stack
 - **Backend Framework**: Django REST Framework
 - **ORM**: Django ORM
-- **Database**: PostgreSQL (production) / SQLite (development)
+- **Database**: MySQL (production) / SQLite (development)
 - **Authentication**: JWT (djangorestframework-simplejwt)
 - **Validation**: Django REST Framework serializers
 - **File Storage**: Django FileField/ImageField + AWS S3 (for documents)
