@@ -28,9 +28,9 @@ class CustomUser(AbstractUser):
         STAFF = 'STAFF', _('Staff (Cook, Guard)')
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    role = models.CharField(max_length=20, choices=Roles.choices, default=Roles.TENANT)
-    phone_number = models.CharField(max_length=15, unique=True, help_text="Used for login and notifications.")
-    email = models.EmailField(unique=True, null=True, blank=True)
+    role = models.CharField(max_length=20, choices=Roles.choices, default=Roles.TENANT, db_index=True)
+    phone_number = models.CharField(max_length=15, unique=True, help_text="Used for login and notifications.", db_index=True)
+    email = models.EmailField(unique=True, null=True, blank=True, db_index=True)
     profile_photo = models.ImageField(upload_to='profiles/', null=True, blank=True)
     
     # USP 11: Women Safety & SOS Button
@@ -38,6 +38,9 @@ class CustomUser(AbstractUser):
     
     # Technical Feature 6: Localization (Multi-Language Support)
     preferred_language = models.CharField(max_length=5, choices=[('en', 'English'), ('hi', 'Hindi'), ('ta', 'Tamil'), ('te', 'Telugu'), ('kn', 'Kannada'), ('bn', 'Bengali')], default='en', help_text="User's preferred language for app interface.")
+
+    # Added verification flag frequently used in login logic
+    is_active = models.BooleanField(_('active'), default=True, help_text=_('Designates whether this user should be treated as active. Unselect this instead of deleting accounts.'), db_index=True)
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
@@ -53,8 +56,8 @@ class TenantProfile(models.Model):
     guardian = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='wards', limit_choices_to={'role': 'PARENT'})
     
     # USP 2: Aadhaar + Police Verification
-    aadhaar_number = models.CharField(max_length=12, null=True, blank=True)
-    police_verification_status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('SUBMITTED', 'Submitted'), ('VERIFIED', 'Verified')], default='PENDING')
+    aadhaar_number = models.CharField(max_length=12, null=True, blank=True, db_index=True)
+    police_verification_status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('SUBMITTED', 'Submitted'), ('VERIFIED', 'Verified')], default='PENDING', db_index=True)
     
     # USP 10: Tenant Credit Score
     credit_score = models.IntegerField(default=700, help_text="Score for timely payments and good conduct.")
@@ -84,10 +87,10 @@ class StaffProfile(models.Model):
         OTHER = 'OTHER', _('Other')
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, limit_choices_to={'role': 'STAFF'})
-    staff_role = models.CharField(max_length=20, choices=StaffRoles.choices)
+    staff_role = models.CharField(max_length=20, choices=StaffRoles.choices, db_index=True)
     daily_rate = models.DecimalField(max_digits=10, decimal_places=2, help_text="Salary per day for payroll calculation.")
     assigned_property = models.ForeignKey('properties.Property', on_delete=models.SET_NULL, null=True, blank=True, related_name='staff_members')
-    joining_date = models.DateField()
+    joining_date = models.DateField(db_index=True)
 
     def __str__(self):
         return f"Staff Profile: {self.user.username}"
@@ -122,7 +125,7 @@ class Property(models.Model):
     preferred_language = models.CharField(max_length=10, choices=[('EN', 'English'), ('HI', 'Hindi'), ('TE', 'Telugu')], default='EN')
     
     # Property metadata
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -136,20 +139,24 @@ class Room(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='rooms')
-    room_number = models.CharField(max_length=10)
-    capacity = models.PositiveIntegerField(default=2, help_text="Number of beds in the room.")
+    room_number = models.CharField(max_length=10, db_index=True)
+    capacity = models.PositiveIntegerField(default=2, help_text="Number of beds in the room.", db_index=True)
     
     # USP 4: Dynamic Pricing Engine
-    base_rent_per_bed = models.DecimalField(max_digits=10, decimal_places=2)
+    base_rent_per_bed = models.DecimalField(max_digits=10, decimal_places=2, db_index=True)
     
     # Room amenities for better filtering
-    has_ac = models.BooleanField(default=False)
-    has_balcony = models.BooleanField(default=False)
-    has_attached_bathroom = models.BooleanField(default=False)
-    floor_number = models.IntegerField(default=0)
+    has_ac = models.BooleanField(default=False, db_index=True)
+    has_balcony = models.BooleanField(default=False, db_index=True)
+    has_attached_bathroom = models.BooleanField(default=False, db_index=True)
+    floor_number = models.IntegerField(default=0, db_index=True)
 
     class Meta:
         unique_together = ('property', 'room_number')
+        indexes = [
+            models.Index(fields=['property', 'has_ac']),
+            models.Index(fields=['property', 'base_rent_per_bed'])
+        ]
 
     def __str__(self):
         return f"{self.property.name} - Room {self.room_number}"
@@ -161,8 +168,8 @@ class PricingRule(models.Model):
     """
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='pricing_rules')
     rule_name = models.CharField(max_length=100, help_text="e.g., Summer Surge")
-    start_month = models.IntegerField(choices=[(i, i) for i in range(1, 13)], help_text="1=January, 12=December")
-    end_month = models.IntegerField(choices=[(i, i) for i in range(1, 13)])
+    start_month = models.IntegerField(choices=[(i, i) for i in range(1, 13)], help_text="1=January, 12=December", db_index=True)
+    end_month = models.IntegerField(choices=[(i, i) for i in range(1, 13)], db_index=True)
     price_multiplier = models.DecimalField(max_digits=3, decimal_places=2, help_text="e.g., 1.10 for 10% increase")
     
     def __str__(self):
@@ -182,7 +189,7 @@ class Bed(models.Model):
     is_occupied = models.BooleanField(default=False, db_index=True)
     
     # USP 5: Smart Electricity Billing (IoT)
-    iot_meter_id = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    iot_meter_id = models.CharField(max_length=50, null=True, blank=True, unique=True, db_index=True)
 
     class Meta:
         unique_together = ('room', 'bed_label')
@@ -218,7 +225,7 @@ class Asset(models.Model):
     qr_code = models.CharField(max_length=255, unique=True, null=True, blank=True)
     purchase_date = models.DateField()
     last_service_date = models.DateField(null=True, blank=True)
-    next_service_due_date = models.DateField(null=True, blank=True)
+    next_service_due_date = models.DateField(null=True, blank=True, db_index=True)
 
     def __str__(self):
         return f"{self.name} in {self.property.name}"
@@ -229,7 +236,7 @@ class AssetServiceLog(models.Model):
     Covers: Advanced Feature 4 (Asset & Inventory) - 'Scan history'
     """
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='service_logs')
-    service_date = models.DateField()
+    service_date = models.DateField(db_index=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     description = models.TextField(help_text="Details of repair or service")
     serviced_by = models.CharField(max_length=100, help_text="Vendor or Staff name")
@@ -265,21 +272,27 @@ class Booking(models.Model):
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.PROTECT, related_name='bookings', limit_choices_to={'role': 'TENANT'})
     bed = models.ForeignKey('properties.Bed', on_delete=models.PROTECT, related_name='bookings')
     
-    start_date = models.DateField()
-    end_date = models.DateField(null=True, blank=True)
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(null=True, blank=True, db_index=True)
     rent_amount = models.DecimalField(max_digits=10, decimal_places=2)
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE, db_index=True)
 
     # USP 8: Zero-Deposit Option
-    is_zero_deposit = models.BooleanField(default=False)
-    fintech_partner_name = models.CharField(max_length=100, null=True, blank=True)
-    fintech_loan_id = models.CharField(max_length=100, null=True, blank=True)
+    is_zero_deposit = models.BooleanField(default=False, db_index=True)
+    fintech_partner_name = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    fintech_loan_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     
     # USP 9: Digital Notice Period & Auto Refund
-    notice_given_date = models.DateField(null=True, blank=True)
+    notice_given_date = models.DateField(null=True, blank=True, db_index=True)
     refund_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    refund_processed_date = models.DateField(null=True, blank=True)
+    refund_processed_date = models.DateField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['status', 'start_date', 'end_date'])
+        ]
 
     def __str__(self):
         return f"Booking for {self.tenant.username} in {self.bed}"
@@ -291,7 +304,7 @@ class DigitalAgreement(models.Model):
     """
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE, primary_key=True)
     agreement_file = models.FileField(upload_to='agreements/')
-    is_signed = models.BooleanField(default=False)
+    is_signed = models.BooleanField(default=False, db_index=True)
     signed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
@@ -316,8 +329,8 @@ class Invoice(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.ForeignKey('tenants.Booking', on_delete=models.PROTECT)
-    issue_date = models.DateField(auto_now_add=True)
-    due_date = models.DateField()
+    issue_date = models.DateField(auto_now_add=True, db_index=True)
+    due_date = models.DateField(db_index=True)
     
     rent_amount = models.DecimalField(max_digits=10, decimal_places=2)
     mess_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
@@ -347,11 +360,11 @@ class Transaction(models.Model):
     user = models.ForeignKey('users.CustomUser', on_delete=models.PROTECT, help_text="User involved in the transaction.")
     property = models.ForeignKey('properties.Property', on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.CharField(max_length=20, choices=Category.choices)
-    is_credit = models.BooleanField(help_text="True if money is coming in, False if going out.")
-    timestamp = models.DateTimeField(auto_now_add=True)
+    category = models.CharField(max_length=20, choices=Category.choices, db_index=True)
+    is_credit = models.BooleanField(help_text="True if money is coming in, False if going out.", db_index=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     description = models.CharField(max_length=255)
-    payment_gateway_txn_id = models.CharField(max_length=100, null=True, blank=True)
+    payment_gateway_txn_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     invoice = models.ForeignKey(Invoice, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions', help_text="Linked invoice if this txn pays a bill.")
 
     def __str__(self):
@@ -364,9 +377,9 @@ class Expense(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
-    category = models.CharField(max_length=50) # e.g., Groceries, Maintenance, Utility Bill
+    category = models.CharField(max_length=50, db_index=True) # e.g., Groceries, Maintenance, Utility Bill
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateField()
+    date = models.DateField(db_index=True)
     description = models.TextField()
     receipt = models.FileField(upload_to='receipts/', null=True, blank=True)
 
@@ -393,10 +406,10 @@ class Complaint(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'TENANT'})
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
-    category = models.CharField(max_length=50)
+    category = models.CharField(max_length=50, db_index=True)
     description = models.TextField()
-    status = models.CharField(max_length=20, choices=[('OPEN', 'Open'), ('IN_PROGRESS', 'In Progress'), ('RESOLVED', 'Resolved')], default='OPEN')
-    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=[('OPEN', 'Open'), ('IN_PROGRESS', 'In Progress'), ('RESOLVED', 'Resolved')], default='OPEN', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     
     # USP 14: AI Chatbot Integration
@@ -412,10 +425,10 @@ class EntryLog(models.Model):
     """
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'TENANT'})
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    direction = models.CharField(max_length=3, choices=[('IN', 'In'), ('OUT', 'Out')])
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    direction = models.CharField(max_length=3, choices=[('IN', 'In'), ('OUT', 'Out')], db_index=True)
     entry_method = models.CharField(max_length=20, choices=[('BIOMETRIC', 'Biometric'), ('QR', 'QR Code'), ('MANUAL', 'Manual')], default='MANUAL')
-    is_late_entry = models.BooleanField(default=False)
+    is_late_entry = models.BooleanField(default=False, db_index=True)
     parent_alert_sent = models.BooleanField(default=False)
 
 class Notice(models.Model):
@@ -426,8 +439,8 @@ class Notice(models.Model):
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     body = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_published = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_published = models.BooleanField(default=True, db_index=True)
 
     def __str__(self):
         return self.title
@@ -440,8 +453,8 @@ class ChatLog(models.Model):
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'TENANT'})
     message = models.TextField(help_text="User's question")
     bot_response = models.TextField(help_text="AI's answer")
-    intent = models.CharField(max_length=50, null=True, blank=True, help_text="Detected intent e.g., 'rent_query'")
-    timestamp = models.DateTimeField(auto_now_add=True)
+    intent = models.CharField(max_length=50, null=True, blank=True, help_text="Detected intent e.g., 'rent_query'", db_index=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"Chat by {self.tenant.username} at {self.timestamp}"
@@ -471,8 +484,8 @@ class SOSAlert(models.Model):
     device_info = models.JSONField(default=dict, blank=True, help_text="Device type, OS, app version")
     
     # Response tracking
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIGGERED)
-    triggered_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIGGERED, db_index=True)
+    triggered_at = models.DateTimeField(auto_now_add=True, db_index=True)
     acknowledged_at = models.DateTimeField(null=True, blank=True, help_text="When manager/security acknowledged")
     resolved_at = models.DateTimeField(null=True, blank=True)
     response_time_seconds = models.IntegerField(null=True, blank=True, help_text="Time to first response in seconds")
@@ -488,7 +501,7 @@ class SOSAlert(models.Model):
     
     # Resolution
     resolution_notes = models.TextField(blank=True, help_text="How incident was resolved")
-    is_genuine_emergency = models.BooleanField(null=True, blank=True, help_text="True if genuine, False if false alarm, Null if undetermined")
+    is_genuine_emergency = models.BooleanField(null=True, blank=True, help_text="True if genuine, False if false alarm, Null if undetermined", db_index=True)
     
     class Meta:
         indexes = [
@@ -520,7 +533,7 @@ class MessMenu(models.Model):
     Covers: Module 6 (Smart Mess)
     """
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
-    date = models.DateField()
+    date = models.DateField(db_index=True)
     breakfast = models.CharField(max_length=255, null=True, blank=True)
     lunch = models.CharField(max_length=255, null=True, blank=True)
     dinner = models.CharField(max_length=255, null=True, blank=True)
@@ -547,11 +560,11 @@ class DailyMealSelection(models.Model):
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'TENANT'})
     menu = models.ForeignKey(MessMenu, on_delete=models.CASCADE)
     
-    breakfast_status = models.CharField(max_length=10, choices=MealStatus.choices, default=MealStatus.EATING)
-    lunch_status = models.CharField(max_length=10, choices=MealStatus.choices, default=MealStatus.EATING)
-    dinner_status = models.CharField(max_length=10, choices=MealStatus.choices, default=MealStatus.EATING)
+    breakfast_status = models.CharField(max_length=10, choices=MealStatus.choices, default=MealStatus.EATING, db_index=True)
+    lunch_status = models.CharField(max_length=10, choices=MealStatus.choices, default=MealStatus.EATING, db_index=True)
+    dinner_status = models.CharField(max_length=10, choices=MealStatus.choices, default=MealStatus.EATING, db_index=True)
     
-    is_billed = models.BooleanField(default=False, help_text="True once the cost is debited from wallet.")
+    is_billed = models.BooleanField(default=False, help_text="True once the cost is debited from wallet.", db_index=True)
 
     class Meta:
         unique_together = ('tenant', 'menu')
@@ -586,12 +599,12 @@ class Lead(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
     full_name = models.CharField(max_length=100)
-    phone_number = models.CharField(max_length=15)
-    email = models.EmailField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
+    phone_number = models.CharField(max_length=15, db_index=True)
+    email = models.EmailField(null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW, db_index=True)
     converted_tenant = models.OneToOneField('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='lead_record', help_text="Linked tenant profile if converted.")
     notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"Lead: {self.full_name} for {self.property.name}"
@@ -630,13 +643,13 @@ class NotificationLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE)
-    notification_type = models.CharField(max_length=20, choices=NotificationType.choices)
-    category = models.CharField(max_length=30, choices=NotificationCategory.choices)
+    notification_type = models.CharField(max_length=20, choices=NotificationType.choices, db_index=True)
+    category = models.CharField(max_length=30, choices=NotificationCategory.choices, db_index=True)
     title = models.CharField(max_length=255)
     message = models.TextField()
-    is_sent = models.BooleanField(default=False)
+    is_sent = models.BooleanField(default=False, db_index=True)
     sent_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"{self.get_notification_type_display()} to {self.user.username}"
@@ -649,7 +662,7 @@ class FCMToken(models.Model):
     user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='fcm_tokens')
     token = models.CharField(max_length=255, unique=True)
     device_type = models.CharField(max_length=20, choices=[('ANDROID', 'Android'), ('IOS', 'iOS'), ('WEB', 'Web')])
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -684,14 +697,14 @@ class VisitorRequest(models.Model):
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE)
     
     visitor_name = models.CharField(max_length=100)
-    visitor_phone = models.CharField(max_length=15)
+    visitor_phone = models.CharField(max_length=15, db_index=True)
     visitor_photo = models.ImageField(upload_to='visitors/', null=True, blank=True)
     purpose = models.CharField(max_length=255)
     
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    requested_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    requested_at = models.DateTimeField(auto_now_add=True, db_index=True)
     approved_at = models.DateTimeField(null=True, blank=True)
-    check_in_time = models.DateTimeField(null=True, blank=True)
+    check_in_time = models.DateTimeField(null=True, blank=True, db_index=True)
     check_out_time = models.DateTimeField(null=True, blank=True)
     
     guard = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='processed_visitors', limit_choices_to={'role': 'STAFF'})
@@ -724,9 +737,9 @@ class InventoryItem(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE, related_name='inventory')
-    item_name = models.CharField(max_length=100)
-    category = models.CharField(max_length=50, help_text="e.g., Groceries, Vegetables, Dairy")
-    current_quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    item_name = models.CharField(max_length=100, db_index=True)
+    category = models.CharField(max_length=50, help_text="e.g., Groceries, Vegetables, Dairy", db_index=True)
+    current_quantity = models.DecimalField(max_digits=10, decimal_places=2, db_index=True)
     unit = models.CharField(max_length=20, choices=Unit.choices)
     minimum_threshold = models.DecimalField(max_digits=10, decimal_places=2, help_text="Alert when stock falls below this")
     last_restocked_date = models.DateField(null=True, blank=True)
@@ -746,9 +759,9 @@ class InventoryTransaction(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='transactions')
-    transaction_type = models.CharField(max_length=20, choices=TransactionType.choices)
+    transaction_type = models.CharField(max_length=20, choices=TransactionType.choices, db_index=True)
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateField(auto_now_add=True)
+    date = models.DateField(auto_now_add=True, db_index=True)
     notes = models.TextField(blank=True)
     recorded_by = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True)
 
@@ -780,8 +793,8 @@ class StaffAttendance(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     staff = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='attendance_records', limit_choices_to={'role': 'STAFF'})
-    date = models.DateField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PRESENT)
+    date = models.DateField(db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PRESENT, db_index=True)
     check_in_time = models.TimeField(null=True, blank=True)
     check_out_time = models.TimeField(null=True, blank=True)
     selfie_photo = models.ImageField(upload_to='staff_attendance/', null=True, blank=True)
@@ -801,13 +814,13 @@ class SalaryPayment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     staff = models.ForeignKey('users.CustomUser', on_delete=models.PROTECT, related_name='salary_payments', limit_choices_to={'role': 'STAFF'})
     property = models.ForeignKey('properties.Property', on_delete=models.PROTECT)
-    month = models.DateField(help_text="First day of the salary month")
+    month = models.DateField(help_text="First day of the salary month", db_index=True)
     days_worked = models.DecimalField(max_digits=5, decimal_places=2)
     daily_rate = models.DecimalField(max_digits=10, decimal_places=2)
     gross_salary = models.DecimalField(max_digits=10, decimal_places=2)
     deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     net_salary = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_date = models.DateField()
+    payment_date = models.DateField(db_index=True)
     payment_mode = models.CharField(max_length=20, choices=[('CASH', 'Cash'), ('BANK', 'Bank Transfer'), ('UPI', 'UPI')])
     transaction_reference = models.CharField(max_length=100, null=True, blank=True)
 
@@ -836,7 +849,14 @@ class HygieneInspection(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE, related_name='hygiene_inspections')
-    inspection_date = models.DateField()
+    category = models.CharField(max_length=50, help_text="e.g., Groceries, Vegetables, Dairy") # No change for this block
+
+    # Wait, I am replacing HygieneInspection items here, not inventory. Let me correct the context.
+    # Ah, I see I am jumping between files. This is a single replacement call for All_Database_Tables_Models.md.
+    # I must ensure the StartLine and TargetContent match the Documentation file, not the code files.
+    
+    # Correcting for HygieneInspection:
+    inspection_date = models.DateField(db_index=True)
     inspector = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True, limit_choices_to={'role__in': ['MANAGER', 'SUPERADMIN']})
     
     cleanliness_score = models.IntegerField(help_text="Score out of 10")
@@ -844,7 +864,7 @@ class HygieneInspection(models.Model):
     bathroom_score = models.IntegerField(help_text="Score out of 10")
     common_area_score = models.IntegerField(help_text="Score out of 10")
     
-    overall_rating = models.DecimalField(max_digits=3, decimal_places=2, help_text="Average rating out of 5")
+    overall_rating = models.DecimalField(max_digits=3, decimal_places=2, help_text="Average rating out of 5", db_index=True)
     photos = models.JSONField(default=list, help_text="List of photo URLs")
     remarks = models.TextField(blank=True)
 
@@ -869,9 +889,9 @@ class ComplaintFeedback(models.Model):
     Covers: Technical Feature 9 (Feedback & Rating Loop)
     """
     complaint = models.OneToOneField('operations.Complaint', on_delete=models.CASCADE, primary_key=True)
-    rating = models.IntegerField(help_text="Rating from 1 to 5")
+    rating = models.IntegerField(help_text="Rating from 1 to 5", db_index=True)
     feedback_text = models.TextField(blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"Feedback for Complaint #{self.complaint.id}"
@@ -884,10 +904,10 @@ class MessFeedback(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'TENANT'})
     menu = models.ForeignKey('mess.MessMenu', on_delete=models.CASCADE)
-    meal_type = models.CharField(max_length=20, choices=[('BREAKFAST', 'Breakfast'), ('LUNCH', 'Lunch'), ('DINNER', 'Dinner')])
-    rating = models.IntegerField(help_text="Rating from 1 to 5")
+    meal_type = models.CharField(max_length=20, choices=[('BREAKFAST', 'Breakfast'), ('LUNCH', 'Lunch'), ('DINNER', 'Dinner')], db_index=True)
+    rating = models.IntegerField(help_text="Rating from 1 to 5", db_index=True)
     feedback_text = models.TextField(blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"Mess Feedback by {self.tenant.username} on {self.menu.date}"
@@ -920,12 +940,12 @@ class AuditLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True)
-    action_type = models.CharField(max_length=20, choices=ActionType.choices)
-    model_name = models.CharField(max_length=100, help_text="Name of the model affected")
-    object_id = models.CharField(max_length=100, help_text="ID of the affected object")
+    action_type = models.CharField(max_length=20, choices=ActionType.choices, db_index=True)
+    model_name = models.CharField(max_length=100, help_text="Name of the model affected", db_index=True)
+    object_id = models.CharField(max_length=100, help_text="ID of the affected object", db_index=True)
     changes = models.JSONField(default=dict, help_text="Before and after values")
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"{self.user.username if self.user else 'System'} - {self.get_action_type_display()} on {self.model_name}"
@@ -948,11 +968,11 @@ class AlumniProfile(models.Model):
     Covers: Advanced Feature 9 (Alumni Network)
     """
     user = models.OneToOneField('users.CustomUser', on_delete=models.CASCADE, primary_key=True)
-    current_company = models.CharField(max_length=100, null=True, blank=True)
+    current_company = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     current_position = models.CharField(max_length=100, null=True, blank=True)
     linkedin_url = models.URLField(null=True, blank=True)
-    is_open_to_referrals = models.BooleanField(default=False)
-    exit_date = models.DateField(help_text="Date when tenant left the PG")
+    is_open_to_referrals = models.BooleanField(default=False, db_index=True)
+    exit_date = models.DateField(help_text="Date when tenant left the PG", db_index=True)
     properties_stayed = models.ManyToManyField('properties.Property', related_name='alumni')
 
     def __str__(self):
@@ -972,11 +992,11 @@ class JobReferral(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     requester = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='referral_requests')
     alumni = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='referrals_given')
-    company_name = models.CharField(max_length=100)
+    company_name = models.CharField(max_length=100, db_index=True)
     position = models.CharField(max_length=100)
     message = models.TextField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.REQUESTED)
-    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.REQUESTED, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -1000,12 +1020,12 @@ class SubscriptionPlan(models.Model):
     Covers: Technical Feature 8 (The SaaS Angle)
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=50, help_text="e.g., Basic, Gold, Platinum")
+    name = models.CharField(max_length=50, help_text="e.g., Basic, Gold, Platinum", db_index=True)
     price_per_month = models.DecimalField(max_digits=10, decimal_places=2)
     max_properties = models.IntegerField(help_text="Maximum number of PG branches allowed")
     max_rooms = models.IntegerField(help_text="Maximum total rooms across all properties")
     features = models.JSONField(default=dict, help_text="Feature flags: {'crm': true, 'alumni': false}")
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     def __str__(self):
         return self.name
@@ -1024,9 +1044,9 @@ class PropertySubscription(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, limit_choices_to={'role': 'SUPERADMIN'})
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIAL)
-    start_date = models.DateField()
-    end_date = models.DateField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TRIAL, db_index=True)
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
     auto_renew = models.BooleanField(default=True)
 
     def __str__(self):
@@ -1037,7 +1057,7 @@ class AppVersion(models.Model):
     Manages app versions for forced updates.
     Covers: Technical Feature 5 (Version Control & App Updates)
     """
-    platform = models.CharField(max_length=10, choices=[('ANDROID', 'Android'), ('IOS', 'iOS')])
+    platform = models.CharField(max_length=10, choices=[('ANDROID', 'Android'), ('IOS', 'iOS')], db_index=True)
     version_code = models.IntegerField(help_text="e.g., 102")
     version_name = models.CharField(max_length=20, help_text="e.g., 1.0.2")
     is_mandatory = models.BooleanField(default=False, help_text="Force update required?")
@@ -1072,12 +1092,12 @@ class GeneratedReport(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey('properties.Property', on_delete=models.CASCADE, null=True, blank=True)
-    report_type = models.CharField(max_length=30, choices=ReportType.choices)
+    report_type = models.CharField(max_length=30, choices=ReportType.choices, db_index=True)
     generated_by = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True)
     file = models.FileField(upload_to='reports/')
-    start_date = models.DateField()
-    end_date = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"{self.get_report_type_display()} - {self.created_at.strftime('%Y-%m-%d')}"
