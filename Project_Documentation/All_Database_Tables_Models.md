@@ -160,6 +160,30 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return f"{self.role}: {self.user.username}"
+
+class ActivityLog(models.Model):
+    """
+    Tracks all critical user actions for audit trail.
+    Ref: Table ActivityLog in DBML
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='activity_logs')
+    action = models.CharField(max_length=255)
+    details = models.TextField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    severity = models.CharField(max_length=20, choices=[('INFO', 'Info'), ('WARNING', 'Warning'), ('CRITICAL', 'Critical')], default='INFO')
+    entity_type = models.CharField(max_length=50, null=True, blank=True, help_text="PAYMENT | TENANT | PROPERTY | ROOM")
+    entity_id = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'timestamp']),
+            models.Index(fields=['entity_type', 'entity_id'])
+        ]
+
+    def __str__(self):
+        return f"{self.action} by {self.user.username} at {self.timestamp}"
 ```
 
 ---
@@ -315,6 +339,30 @@ class AssetServiceHistory(models.Model):
     vendor_contact = models.CharField(max_length=50, null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class ElectricityReading(models.Model):
+    """
+    Bed-specific electricity meter readings. USP #5.
+    Ref: Table ElectricityReading in DBML
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bed = models.ForeignKey(Bed, on_delete=models.CASCADE, related_name='electricity_readings')
+    tenant = models.ForeignKey('users.TenantProfile', on_delete=models.SET_NULL, null=True, blank=True)
+    reading_kwh = models.DecimalField(max_digits=10, decimal_places=2, help_text="USP #5 - IoT meter reading")
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    units_consumed = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    cost_calculated = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    rate_per_unit = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    billing_month = models.CharField(max_length=20, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['bed', 'timestamp']),
+            models.Index(fields=['tenant', 'billing_month'])
+        ]
+
+    def __str__(self):
+        return f"Reading: {self.reading_kwh} kWh for {self.bed}"
 ```
 
 ---
@@ -729,9 +777,10 @@ class MessFeedback(models.Model):
     date = models.DateField()
     meal_type = models.CharField(max_length=20, choices=[('BREAKFAST', 'Breakfast'), ('LUNCH', 'Lunch'), ('DINNER', 'Dinner')])
     
-    rating = models.IntegerField()
+    rating = models.IntegerField(help_text="Overall rating 1-5 stars")
     taste_rating = models.IntegerField(null=True, blank=True)
     quality_rating = models.IntegerField(null=True, blank=True)
+    temperature_rating = models.IntegerField(null=True, blank=True)
     quantity_rating = models.IntegerField(null=True, blank=True)
     
     comments = models.TextField(null=True, blank=True)
@@ -821,15 +870,24 @@ class FCMToken(models.Model):
 
 class MessageTemplate(models.Model):
     """
-    Predefined templates for WhatsApp/SMS.
+    Predefined templates for WhatsApp/SMS/Email.
     Ref: Table MessageTemplate in DBML
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=50, unique=True)
-    content = models.TextField(help_text="Use {{variable}} for dynamic content.")
-    channel = models.CharField(max_length=20, choices=[('SMS', 'SMS'), ('WHATSAPP', 'WhatsApp'), ('EMAIL', 'Email')])
+    property = models.ForeignKey('properties.Property', on_delete=models.CASCADE, related_name='message_templates')
+    template_name = models.CharField(max_length=100)
+    message_type = models.CharField(max_length=20, choices=[('SMS', 'SMS'), ('WHATSAPP', 'WhatsApp'), ('EMAIL', 'Email'), ('PUSH', 'Push')])
+    template_content = models.TextField(help_text="Use {{variable}} for dynamic content.")
+    variables = models.JSONField(default=list, blank=True, help_text="JSON array of variable placeholders")
     is_active = models.BooleanField(default=True)
+    category = models.CharField(max_length=50, choices=[('RENT_REMINDER', 'Rent Reminder'), ('NOTICE', 'Notice'), ('EMERGENCY', 'Emergency'), ('MARKETING', 'Marketing')], null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['property', 'category'])]
+
+    def __str__(self):
+        return f"{self.template_name} ({self.message_type})"
 ```
 
 ---
