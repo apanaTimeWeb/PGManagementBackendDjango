@@ -1,0 +1,912 @@
+// ==========================================
+// Smart PG Management System - Database Schema
+// ==========================================
+// Total Tables: 42+
+// Architecture: Modular Monolith (Django)
+// Database: MySQL
+// Generated for: dbdiagram.io
+// ==========================================
+
+// ==========================================
+// 1. USER MANAGEMENT & AUTH
+// ==========================================
+
+Table CustomUser {
+  id uuid [pk]
+  username varchar [unique, not null]
+  email varchar [unique, not null]
+  phone_number varchar [unique]
+  password_hash varchar [not null]
+  role varchar [not null, note: 'SUPERADMIN | OWNER | MANAGER | TENANT | PARENT']
+  language_code varchar [default: 'en', note: 'en | hi | ta | te | kn | bn (USP #16)']
+  date_of_birth date
+  gender varchar [note: 'MALE | FEMALE | OTHER']
+  profile_photo_url varchar
+  is_active boolean [default: true]
+  email_verified boolean [default: false]
+  phone_verified boolean [default: false]
+  created_at timestamp [default: `now()`]
+  last_login timestamp
+
+  indexes {
+    (email, phone_number) [unique]
+    role
+  }
+}
+
+Table OwnerProfile {
+  id uuid [pk]
+  user_id uuid [ref: > CustomUser.id, not null, unique]
+  business_name varchar [not null]
+  gst_number varchar [unique]
+  pan_number varchar [unique]
+  business_established date
+  total_properties int [default: 0]
+  company_address text
+  created_at timestamp [default: `now()`]
+}
+
+Table ParentStudentMapping {
+  id uuid [pk]
+  parent_user_id uuid [ref: > CustomUser.id, not null]
+  student_tenant_id uuid [ref: > TenantProfile.id, not null]
+  relationship varchar [note: 'FATHER | MOTHER | GUARDIAN']
+  has_access boolean [default: true]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (parent_user_id, student_tenant_id) [unique]
+  }
+}
+
+Table TenantProfile {
+  id uuid [pk]
+  user_id uuid [ref: > CustomUser.id, not null, unique]
+  property_id uuid [ref: > Property.id]
+  room_id uuid [ref: > Room.id]
+  bed_id uuid [ref: > Bed.id]
+  aadhaar_number varchar [unique]
+  aadhaar_url varchar
+  id_proof_type varchar [note: 'AADHAR | PAN | PASSPORT | DRIVING_LICENSE']
+  id_proof_url varchar
+  police_verification_status varchar [default: 'PENDING', note: 'PENDING | SUBMITTED | VERIFIED | REJECTED (USP #2)']
+  wallet_balance decimal(10,2) [default: 0]
+  pg_credit_score int [default: 0, note: 'USP #10']
+  guardian_name varchar
+  guardian_phone varchar
+  education_details text
+  college_name varchar
+  course_name varchar
+  check_in_date date
+  exit_date date
+  notice_period_days int [default: 30]
+  check_in_photos text [note: 'JSON array']
+  room_inspection_photos text [note: 'JSON array']
+  created_at timestamp [default: `now()`]
+  
+  // AI Matching Preferences (USP #6)
+  sleep_schedule varchar [note: 'EARLY_BIRD | NIGHT_OWL']
+  dietary_preference varchar [note: 'VEG | NON_VEG | VEGAN']
+  cleanliness_level varchar [note: 'HIGH | MEDIUM | LOW']
+  smoking_habit varchar [note: 'SMOKER | NON_SMOKER']
+  study_hours varchar [note: 'DAY | NIGHT']
+  noise_tolerance varchar [note: 'HIGH | LOW']
+  personality_type varchar [note: 'INTROVERT | EXTROVERT']
+
+  indexes {
+    user_id
+    property_id
+    bed_id
+  }
+}
+
+Table StaffProfile {
+  id uuid [pk]
+  user_id uuid [ref: > CustomUser.id, not null, unique]
+  property_id uuid [ref: > Property.id, not null]
+  role varchar [note: 'COOK | GUARD | CLEANER | MANAGER | MAINTENANCE']
+  salary decimal(10,2)
+  aadhar_number varchar
+  police_verification_status varchar [default: 'PENDING', note: 'PENDING | VERIFIED']
+  contract_start_date date
+  contract_end_date date
+  bank_account_number varchar
+  ifsc_code varchar
+  joined_at timestamp [default: `now()`]
+  employment_status varchar [default: 'ACTIVE', note: 'ACTIVE | RESIGNED | TERMINATED']
+
+  indexes {
+    property_id
+    employment_status
+  }
+}
+
+Table ActivityLog {
+  id uuid [pk]
+  user_id uuid [ref: > CustomUser.id, not null]
+  action varchar [not null]
+  details text
+  ip_address varchar
+  timestamp timestamp [default: `now()`]
+  severity varchar [default: 'INFO', note: 'INFO | WARNING | CRITICAL']
+  entity_type varchar [note: 'PAYMENT | TENANT | PROPERTY | ROOM']
+  entity_id uuid
+
+  indexes {
+    user_id
+    timestamp
+    entity_type
+  }
+}
+
+// ==========================================
+// 2. PROPERTY MANAGEMENT
+// ==========================================
+
+Table Property {
+  id uuid [pk]
+  owner_id uuid [ref: > OwnerProfile.id, not null]
+  name varchar [not null]
+  address text [not null]
+  city varchar [not null]
+  state varchar [not null]
+  pincode varchar
+  gst_number varchar
+  pan_number varchar
+  total_floors int
+  property_type varchar [note: 'BOYS | GIRLS | CO_ED']
+  latitude decimal(10,8)
+  longitude decimal(11,8)
+  images_url text [note: 'JSON array']
+  established_year int
+  license_number varchar
+  iot_enabled boolean [default: false, note: 'USP #5']
+  monthly_revenue decimal(12,2) [default: 0]
+  hygiene_score decimal(3,2) [default: 0, note: 'USP #13']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    owner_id
+    city
+    property_type
+  }
+}
+
+Table Room {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  room_number varchar [not null]
+  floor varchar
+  type varchar [note: 'SINGLE | DOUBLE | TRIPLE | DORMITORY']
+  base_rent decimal(10,2) [not null]
+  current_rent decimal(10,2)
+  electricity_reading decimal(10,2)
+  has_ac boolean [default: false]
+  has_balcony boolean [default: false]
+  has_wifi boolean [default: true]
+  has_attached_bathroom boolean [default: false]
+  window_count int [default: 1]
+  carpet_area_sqft decimal(8,2)
+  images_url text [note: 'JSON array']
+  last_maintenance_date date
+  status varchar [default: 'AVAILABLE', note: 'AVAILABLE | OCCUPIED | MAINTENANCE']
+
+  indexes {
+    property_id
+    status
+    (property_id, room_number) [unique]
+  }
+}
+
+Table PricingRule {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  rule_name varchar [note: 'SEASONAL | FESTIVAL | EXAM_SEASON (USP #4)']
+  start_date date
+  end_date date
+  price_multiplier decimal(4,2) [note: 'e.g. 1.1x for 10% increase']
+  is_active boolean [default: true]
+  description text
+
+  indexes {
+    property_id
+    (start_date, end_date)
+  }
+}
+
+Table Bed {
+  id uuid [pk]
+  room_id uuid [ref: > Room.id, not null]
+  label varchar [note: 'A | B | C | D']
+  is_occupied boolean [default: false]
+  iot_meter_id varchar [unique, note: 'USP #5 - Smart meter ID']
+  public_uid varchar [unique, note: 'USP #3 - Vacant Bed Link']
+  current_tenant_id uuid [ref: > TenantProfile.id]
+  last_occupied_date date
+
+  indexes {
+    room_id
+    is_occupied
+    public_uid
+  }
+}
+
+Table Asset {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  room_id uuid [ref: > Room.id]
+  name varchar [not null]
+  qr_code varchar [unique]
+  category varchar [note: 'APPLIANCE | FURNITURE | OTHER']
+  purchase_date date
+  purchase_price decimal(10,2)
+  warranty_expiry date
+  next_service_date date
+  condition varchar [note: 'NEW | GOOD | NEEDS_REPAIR | DAMAGED']
+  assigned_to varchar [note: 'ROOM | COMMON_AREA']
+
+  indexes {
+    property_id
+    qr_code
+  }
+}
+
+Table AssetServiceHistory {
+  id uuid [pk]
+  asset_id uuid [ref: > Asset.id, not null]
+  service_date date [not null]
+  type varchar [note: 'MAINTENANCE | REPAIR | REPLACEMENT']
+  cost decimal(10,2)
+  vendor_name varchar
+  vendor_contact varchar
+  remarks text
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    asset_id
+    service_date
+  }
+}
+
+// ==========================================
+// 3. BOOKINGS & PAYMENTS
+// ==========================================
+
+Table Booking {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  bed_id uuid [ref: > Bed.id, not null]
+  check_in_time timestamp
+  check_out_time timestamp
+  start_date date [not null]
+  end_date date
+  security_deposit decimal(10,2)
+  status varchar [default: 'ACTIVE', note: 'ACTIVE | NOTICE | EXPIRED | CANCELLED']
+  initial_room_condition text
+  final_room_condition text
+  deposit_refund_date date
+  
+  // Payment & Zero Deposit (USP #8)
+  payment_mode varchar [note: 'NORMAL | ZERO_DEPOSIT_LOAN']
+  loan_provider varchar [note: 'CREDITMANTRI | KREDITBEE | SLICE']
+  loan_application_id varchar
+  loan_status varchar [note: 'PENDING | APPROVED | REJECTED']
+
+  // Notice & Refund (USP #9)
+  notice_given_date date
+  planned_exit_date date
+  refund_amount decimal(10,2)
+  refund_status varchar [note: 'CALCULATING | PROCESSED | FAILED']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    bed_id
+    status
+  }
+}
+
+Table DigitalAgreement {
+  id uuid [pk]
+  booking_id uuid [ref: - Booking.id, not null]
+  document_url varchar
+  signature_hash varchar
+  biometric_data text
+  signed_at timestamp
+  status varchar [default: 'PENDING', note: 'PENDING | SIGNED | REJECTED (USP #7)']
+  ip_address varchar
+  device_info text
+
+  indexes {
+    booking_id
+  }
+}
+
+Table Payment {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  invoice_id uuid [ref: > Invoice.id]
+  amount decimal(10,2) [not null]
+  type varchar [note: 'RENT | MESS | ELECTRICITY | WATER | WIFI | DEPOSIT | OTHER']
+  status varchar [default: 'PENDING', note: 'COMPLETED | PENDING | FAILED']
+  due_date date
+  paid_date date
+  transaction_id varchar [unique]
+  payment_method varchar [note: 'UPI | CARD | NET_BANKING | CASH']
+  upi_transaction_id varchar
+  gateway_name varchar [note: 'RAZORPAY | PAYTM | PHONEPE']
+  gateway_response text
+  receipt_url varchar
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    invoice_id
+    status
+    transaction_id
+  }
+}
+
+Table Invoice {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  booking_id uuid [ref: > Booking.id]
+  invoice_number varchar [unique, not null, note: 'e.g. INV-2026-001']
+  total_amount decimal(10,2) [not null]
+  rent_amount decimal(10,2)
+  electricity_amount decimal(10,2)
+  water_charges decimal(10,2)
+  wifi_charges decimal(10,2)
+  parking_charges decimal(10,2)
+  mess_amount decimal(10,2)
+  late_fee decimal(10,2)
+  discount_amount decimal(10,2)
+  gst_amount decimal(10,2)
+  billing_month date
+  due_date date [not null]
+  is_paid boolean [default: false]
+  pdf_url varchar
+  sent_via varchar [note: 'SMS | EMAIL | WHATSAPP | ALL']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    invoice_number
+    billing_month
+  }
+}
+
+Table Expense {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  category varchar [note: 'MAINTENANCE | GROCERY | UTILITY | SALARY | OTHER']
+  amount decimal(10,2) [not null]
+  description text
+  incurred_date date [not null]
+  receipt_url varchar
+  status varchar [default: 'PENDING', note: 'PENDING | APPROVED | REJECTED']
+  approved_by_user_id uuid [ref: > CustomUser.id]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    property_id
+    category
+    incurred_date
+  }
+}
+
+Table RefundTransaction {
+  id uuid [pk]
+  booking_id uuid [ref: > Booking.id, not null]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  refund_amount decimal(10,2) [not null]
+  refund_type varchar [note: 'SECURITY_DEPOSIT | ADVANCE_RENT | MESS_WALLET | OTHER']
+  refund_date date
+  transaction_id varchar [unique]
+  status varchar [default: 'PENDING', note: 'PENDING | PROCESSED | FAILED']
+  payment_method varchar [note: 'UPI | BANK_TRANSFER | CASH']
+  reason text
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    booking_id
+    tenant_id
+    status
+  }
+}
+
+// ==========================================
+// 4. MESS MANAGEMENT
+// ==========================================
+
+Table MessMenu {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  date date [not null]
+  breakfast_items text
+  lunch_items text
+  dinner_items text
+  veg_items text [note: 'JSON array']
+  non_veg_items text [note: 'JSON array']
+  special_item varchar [note: 'e.g. Friday Biryani']
+  price_breakfast decimal(6,2)
+  price_lunch decimal(6,2)
+  price_dinner decimal(6,2)
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    property_id
+    date
+    (property_id, date) [unique]
+  }
+}
+
+Table DailyMealSelection {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  menu_id uuid [ref: > MessMenu.id, not null]
+  date date [not null]
+  meal_type varchar [note: 'BREAKFAST | LUNCH | DINNER']
+  is_eating boolean [default: true, note: 'USP #15 - Pay-per-day']
+  cost_deducted decimal(6,2)
+  selected_at timestamp [default: `now()`]
+  meal_item_selected varchar
+
+  indexes {
+    tenant_id
+    menu_id
+    date
+    (tenant_id, date, meal_type) [unique]
+  }
+}
+
+Table MessFeedback {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  menu_id uuid [ref: > MessMenu.id, not null]
+  date date [not null]
+  meal_type varchar [note: 'BREAKFAST | LUNCH | DINNER']
+  rating int [note: '1-5 stars']
+  taste_rating int
+  quality_rating int
+  temperature_rating int
+  quantity_rating int
+  comments text
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    menu_id
+    date
+  }
+}
+
+// ==========================================
+// 5. OPERATIONS & UTILITIES
+// ==========================================
+
+Table Complaint {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  property_id uuid [ref: > Property.id, not null]
+  room_id uuid [ref: > Room.id]
+  assigned_to_staff_id uuid [ref: > StaffProfile.id]
+  category varchar [note: 'PLUMBING | ELECTRICAL | FOOD | CLEANLINESS | WIFI | SAFETY | OTHER']
+  description text [not null]
+  status varchar [default: 'OPEN', note: 'OPEN | IN_PROGRESS | RESOLVED | CLOSED']
+  priority varchar [default: 'MEDIUM', note: 'LOW | MEDIUM | HIGH | URGENT']
+  image_url text [note: 'JSON array']
+  video_url text [note: 'JSON array']
+  created_at timestamp [default: `now()`]
+  resolved_at timestamp
+  estimated_resolution_hours int
+  actual_resolution_hours int
+  resolution_notes text
+  rating int [note: '1-5 Stars']
+  feedback_comments text
+
+  indexes {
+    tenant_id
+    property_id
+    status
+    priority
+  }
+}
+
+Table EmergencyAlert {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  triggered_at timestamp [default: `now()`]
+  location_coordinates varchar
+  type varchar [note: 'SOS_BUTTON | NIGHT_ENTRY | GEOFENCE_EXIT | UNAUTHORIZED_ENTRY (USP #11)']
+  status varchar [default: 'TRIGGERED', note: 'TRIGGERED | ACKNOWLEDGED | RESOLVED']
+  resolved_by_user_id uuid [ref: > CustomUser.id]
+  alert_sent_to text [note: 'JSON array of user IDs']
+  response_time_seconds int
+  resolution_notes text
+  photo_url varchar
+  resolved_at timestamp
+
+  indexes {
+    tenant_id
+    triggered_at
+    status
+  }
+}
+
+Table EntryLog {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  property_id uuid [ref: > Property.id, not null]
+  timestamp timestamp [default: `now()`]
+  direction varchar [note: 'IN | OUT']
+  method varchar [note: 'BIOMETRIC | QR | FACE_ID | RFID']
+  parent_alert_sent boolean [default: false, note: 'USP #12']
+  photo_url varchar
+  gps_location varchar
+  device_id varchar
+  is_late_entry boolean [default: false, note: 'After 11 PM']
+
+  indexes {
+    tenant_id
+    property_id
+    timestamp
+  }
+}
+
+Table ChatLog {
+  id uuid [pk]
+  user_id uuid [ref: > CustomUser.id, not null]
+  message_content text [not null]
+  bot_response text
+  platform varchar [note: 'WHATSAPP | IN_APP | SMS (USP #14)']
+  intent varchar [note: 'COMPLAINT | INFO | PAYMENT | OTHER']
+  bot_handled boolean [default: false]
+  timestamp timestamp [default: `now()`]
+
+  indexes {
+    user_id
+    timestamp
+    platform
+  }
+}
+
+Table HygieneInspection {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  inspector_id uuid [ref: > CustomUser.id, not null]
+  inspection_date date [not null]
+  area varchar [note: 'KITCHEN | COMMON | WASHROOM | ROOM | EXTERIOR (USP #13)']
+  score_out_of_5 int [not null]
+  photo_proof_url text [note: 'JSON array']
+  remarks text
+  issues_found text
+  action_taken text
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    property_id
+    inspection_date
+  }
+}
+
+Table ElectricityReading {
+  id uuid [pk]
+  bed_id uuid [ref: > Bed.id, not null]
+  tenant_id uuid [ref: > TenantProfile.id]
+  reading_kwh decimal(10,2) [not null, note: 'USP #5']
+  timestamp timestamp [default: `now()`]
+  units_consumed decimal(8,2)
+  cost_calculated decimal(8,2)
+  rate_per_unit decimal(6,2)
+  billing_month varchar
+
+  indexes {
+    bed_id
+    tenant_id
+    timestamp
+  }
+}
+
+Table VisitorRequest {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  property_id uuid [ref: > Property.id, not null]
+  visitor_name varchar [not null]
+  visitor_phone varchar [not null]
+  visitor_id_proof_type varchar
+  visitor_id_proof_number varchar
+  purpose text
+  relationship varchar
+  check_in timestamp
+  check_out timestamp
+  status varchar [default: 'PENDING', note: 'PENDING | APPROVED | REJECTED | CHECKED_IN | CHECKED_OUT']
+  photo_url varchar
+  approved_by varchar
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    property_id
+    status
+  }
+}
+
+Table Notice {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  title varchar [not null]
+  content text [not null]
+  priority varchar [default: 'NORMAL', note: 'NORMAL | IMPORTANT | URGENT']
+  is_pinned boolean [default: false]
+  expires_at timestamp
+  created_at timestamp [default: `now()`]
+  created_by_user_id uuid [ref: > CustomUser.id, not null]
+
+  indexes {
+    property_id
+    created_at
+  }
+}
+
+Table InventoryItem {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  name varchar [not null]
+  category varchar [note: 'GROCERY | CONSUMABLES | ASSET | MAINTENANCE']
+  quantity decimal(10,2) [not null]
+  unit varchar [note: 'KG | L | PCS | BOXES']
+  min_threshold decimal(10,2)
+  last_restocked date
+  cost_per_unit decimal(8,2)
+  supplier_name varchar
+  status varchar [default: 'IN_STOCK', note: 'IN_STOCK | LOW_STOCK | OUT_OF_STOCK']
+
+  indexes {
+    property_id
+    status
+  }
+}
+
+Table Notification {
+  id uuid [pk]
+  user_id uuid [ref: > CustomUser.id, not null]
+  notification_type varchar [note: 'RENT_DUE | LATE_ENTRY | SOS | COMPLAINT | PAYMENT_SUCCESS | MESS_MENU']
+  title varchar [not null]
+  message text [not null]
+  channel varchar [note: 'SMS | EMAIL | WHATSAPP | PUSH']
+  is_read boolean [default: false]
+  sent_at timestamp [default: `now()`]
+  read_at timestamp
+  action_url varchar
+
+  indexes {
+    user_id
+    is_read
+    sent_at
+  }
+}
+
+// ==========================================
+// 6. STAFF & PAYROLL
+// ==========================================
+
+Table StaffAttendance {
+  id uuid [pk]
+  staff_id uuid [ref: > StaffProfile.id, not null]
+  date date [not null]
+  check_in time
+  check_out time
+  status varchar [note: 'PRESENT | ABSENT | LEAVE | HALF_DAY']
+  selfie_url varchar
+  gps_location varchar
+  remarks text
+
+  indexes {
+    staff_id
+    date
+    (staff_id, date) [unique]
+  }
+}
+
+Table SalaryPayment {
+  id uuid [pk]
+  staff_id uuid [ref: > StaffProfile.id, not null]
+  base_amount decimal(10,2) [not null]
+  bonus decimal(10,2) [default: 0]
+  deductions decimal(10,2) [default: 0]
+  net_amount decimal(10,2) [not null]
+  payment_date date
+  month_year varchar [not null]
+  status varchar [default: 'PENDING', note: 'PAID | PENDING']
+  transaction_id varchar [unique]
+  payment_method varchar
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    staff_id
+    month_year
+    (staff_id, month_year) [unique]
+  }
+}
+
+// ==========================================
+// 7. ADVANCED MODULES
+// ==========================================
+
+Table Lead {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  name varchar [not null]
+  phone varchar [not null]
+  email varchar
+  status varchar [default: 'NEW', note: 'NEW | CALLED | VISITED | CONVERTED | LOST']
+  interest_level varchar [note: 'HIGH | MEDIUM | LOW']
+  preferred_room_type varchar
+  budget decimal(10,2)
+  notes text
+  last_contacted date
+  assigned_to_manager_id uuid [ref: > StaffProfile.id]
+  source varchar [note: 'WALK_IN | ONLINE | REFERRAL | ADVERTISEMENT']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    property_id
+    status
+    phone
+  }
+}
+
+Table SaaS_Subscription {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  plan_id uuid [ref: > SubscriptionPlan.id, not null]
+  plan_name varchar [note: 'BASIC | GOLD | PLATINUM (USP #15)']
+  start_date date [not null]
+  expiry_date date [not null]
+  price decimal(10,2) [not null]
+  max_properties int
+  status varchar [default: 'TRIAL', note: 'ACTIVE | EXPIRED | TRIAL | CANCELLED']
+  auto_renewal boolean [default: false]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    property_id
+    expiry_date
+  }
+}
+
+Table SubscriptionPlan {
+  id uuid [pk]
+  plan_name varchar [unique, not null, note: 'BASIC | GOLD | PLATINUM']
+  description text
+  monthly_price decimal(10,2)
+  yearly_price decimal(10,2)
+  max_properties int
+  max_beds int
+  iot_enabled boolean [default: false]
+  ai_chatbot_enabled boolean [default: false]
+  analytics_enabled boolean [default: false]
+  parent_portal_enabled boolean [default: false]
+  mess_management_enabled boolean [default: false]
+  max_users int
+  is_active boolean [default: true]
+
+  indexes {
+    plan_name
+  }
+}
+
+Table AlumniProfile {
+  id uuid [pk]
+  tenant_id uuid [ref: - TenantProfile.id, not null]
+  current_company varchar
+  designation varchar
+  linkedin_url varchar
+  location varchar
+  graduation_year int
+  willing_to_mentor boolean [default: false, note: 'USP #13']
+  open_to_referrals boolean [default: false]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    graduation_year
+  }
+}
+
+Table JobReferral {
+  id uuid [pk]
+  alumni_id uuid [ref: > AlumniProfile.id, not null]
+  company_name varchar [not null]
+  role_title varchar [not null]
+  description text
+  apply_link varchar
+  job_type varchar [note: 'FULL_TIME | INTERNSHIP | CONTRACT']
+  experience_required varchar
+  location varchar
+  posted_at date [default: `now()`]
+  expires_at date
+  status varchar [default: 'ACTIVE', note: 'ACTIVE | FILLED | EXPIRED']
+
+  indexes {
+    alumni_id
+    status
+    posted_at
+  }
+}
+
+Table GeofenceSettings {
+  id uuid [pk]
+  parent_id uuid [ref: > CustomUser.id, not null]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  safe_zone_radius_meters decimal(8,2)
+  safe_zone_center_lat varchar
+  safe_zone_center_lng varchar
+  alert_on_zone_exit boolean [default: true, note: 'USP #14']
+  alert_time_start time [note: 'e.g. 22:00']
+  alert_time_end time [note: 'e.g. 06:00']
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    parent_id
+    tenant_id
+  }
+}
+
+Table MessageTemplate {
+  id uuid [pk]
+  property_id uuid [ref: > Property.id, not null]
+  template_name varchar [not null]
+  message_type varchar [note: 'SMS | WHATSAPP | EMAIL | PUSH']
+  template_content text [not null]
+  variables text [note: 'JSON array of variable placeholders']
+  is_active boolean [default: true]
+  category varchar [note: 'RENT_REMINDER | NOTICE | EMERGENCY | MARKETING']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    property_id
+    category
+  }
+}
+
+Table VideoCallLog {
+  id uuid [pk]
+  parent_id uuid [ref: > CustomUser.id]
+  manager_id uuid [ref: > StaffProfile.id]
+  tenant_id uuid [ref: > TenantProfile.id]
+  call_start_time timestamp [not null]
+  call_end_time timestamp
+  duration_seconds int
+  call_purpose varchar [note: 'INSPECTION | QUERY | EMERGENCY | ROUTINE']
+  call_status varchar [note: 'COMPLETED | MISSED | DECLINED']
+  recording_url varchar
+
+  indexes {
+    parent_id
+    manager_id
+    call_start_time
+  }
+}
+
+Table RoomChangeHistory {
+  id uuid [pk]
+  tenant_id uuid [ref: > TenantProfile.id, not null]
+  previous_room_id uuid [ref: > Room.id, not null]
+  new_room_id uuid [ref: > Room.id, not null]
+  previous_bed_id uuid [ref: > Bed.id]
+  new_bed_id uuid [ref: > Bed.id]
+  change_date date [not null]
+  reason text
+  rent_difference decimal(8,2)
+  approved_by_user_id uuid [ref: > CustomUser.id, not null]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    tenant_id
+    change_date
+  }
+}
