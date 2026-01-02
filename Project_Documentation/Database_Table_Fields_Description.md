@@ -29,343 +29,211 @@ Ye module decide karta hai ki login karne wala insaan **Malik (Admin)** hai, **S
 **Fields**:
 
   - `id` (UUID, Primary Key)
-      - **Why**: Database ko har user ko alag pehchanne ke liye ek unique identifier chahiye. UUID use karne se security aur scalability better hoti hai.
+      - **Why**: Unique identifier for scalability.
       - **Example**: `550e8400-e29b-41d4-a716-446655440000`
-  - `username` (String, Unique)
-      - **Why**: Login karne ke liye ID.
-      - **Example**: `rahul123`
-  - `email` (Email, Unique)
-      - **Why**: Registration aur password reset ke liye zaroori hai. Services documentation mein email required hai.
-      - **Example**: `rahul@example.com`
-  - `role` (Enum: ADMIN, MANAGER, TENANT, PARENT)
-      - **Why**: System ko kaise pata chalega ki kisko "Dashboard" dikhana hai aur kisko "Rent Button"? Role se hi permission set hogi.
+  - `role` (Enum: SUPERADMIN, MANAGER, TENANT, PARENT, STAFF)
+      - **Why**: Determines access level (Dashboard vs Rent Button).
       - **Example**: `TENANT`
   - `phone_number` (String, Unique)
-      - **Why**: Aajkal email se zyada OTP login chalta hai. Aur communication ke liye bhi zaroori hai.
+      - **Why**: Primary login method via OTP.
       - **Example**: `+919876543210`
-  - `sos_contact_number` (String, Nullable)
-      - **Why (USP 11)**: Jab **Panic Button** dabega, toh call kisko jayega? Ye number emergency ke liye save rehta hai.
-      - **Example**: `+919998887776` (Papa ka number)
-  - `profile_photo` (Image, Nullable)
-      - **Why**: Guard ko gate par shakal milane ke liye photo chahiye.
-      - **Example**: `profiles/rahul_face.jpg`
-  - `preferred_language` (Enum: en, hi, ta, te, kn, bn)
-      - **Why (Technical Feature 6)**: User apni preferred language mein app use kar sake - Staff (Cook/Guard) ko Hindi chahiye, Parents ko regional language. System UI is language mein dikhega.
-      - **Example**: `hi` (Hindi)
-      - **Choices**: English (en), Hindi (hi), Tamil (ta), Telugu (te), Kannada (kn), Bengali (bn)
+  - `email` (Email, Unique, Nullable)
+      - **Why**: For official communication/resets.
+      - **Example**: `rahul@example.com`
+  - `profile_photo_url` (String, Nullable)
+      - **Why**: Visual identification for guards.
+      - **Example**: `"https://s3.aws/profiles/rahul.jpg"`
+  - `is_phone_verified` (Boolean)
+      - **Why**: Security check.
+      - **Example**: `True`
+  - `language_code` (Enum: en, hi, ta, te, kn, bn)
+      - **Why (Technical Feature 6)**: Localization preference.
+      - **Example**: `hi`
 
-#### 1.2 Table: `TenantProfile`
+#### 1.2 Table: `OwnerProfile` (NEW)
 
-**Description**: Sirf "Students" ke liye extra details. User table mein sab mixed hain, lekin student ka data (wallet, aadhaar) yahan rahega.
-**Fields**:
-
-  - `user_id` (Foreign Key -\> CustomUser)
-      - **Why**: Ye link karta hai ki kaunsa User "Rahul" hai.
-      - **Example**: `550e8400-e29b-41d4-a716-446655440000`
-  - `guardian_user_id` (Foreign Key -\> CustomUser)
-      - **Why (USP 1)**: Parent Portal feature ke liye. Hamein link karna padega ki "Rahul ka baap kaun hai" taaki unhe sirf Rahul ka data dikhe.
-      - **Example**: `550e8400-e29b-41d4-a716-446655440001` (Mr. Sharma)
-  - `aadhaar_number` (String, Nullable)
-      - **Why (USP 2)**: Police Verification automate karne ke liye exact Gov ID number chahiye. Nullable hai kyuki registration time optional hai.
-      - **Example**: `4567-8901-2345`
-  - `aadhaar_card_front` (Image, Nullable)
-      - **Why (USP 2)**: Aadhaar card ka front photo police verification ke liye.
-      - **Example**: `docs/aadhaar/rahul_front.jpg`
-  - `aadhaar_card_back` (Image, Nullable)
-      - **Why (USP 2)**: Aadhaar card ka back photo police verification ke liye.
-      - **Example**: `docs/aadhaar/rahul_back.jpg`
-  - `police_verification_status` (Enum)
-      - **Why (USP 2)**: Police verification ka status track karne ke liye.
-      - **Example**: `VERIFIED`
-  - `pg_credit_score` (Integer, Default: 700)
-      - **Why (USP 10)**: Jaise CIBIL score hota hai, waise hi PG score. Rent time pe diya toh score badhega.
-      - **Example**: `750`
-  - `wallet_balance` (Decimal)
-      - **Why (USP 15)**: **Sabse Important Field**. Mess ka khana aur fines ka paisa yahin se katega.
-      - **Example**: `2500.00` (Rupees)
-  - `sleep_schedule` (Enum: EARLY_BIRD, NIGHT_OWL, FLEXIBLE)
-      - **Why (USP 6)**: AI Compatibility Matching ke liye. System samaan sleep pattern wale students ko ek room mein dega taaki ladai na ho.
-      - **Example**: `NIGHT_OWL` (Raat 2 baje sota hai)
-  - `cleanliness_level` (Enum: HIGH, MEDIUM, LOW)
-      - **Why (USP 6)**: Cleanliness preference. High cleanliness wala Low wale ke saath nahi rahega.
-      - **Example**: `HIGH`
-  - `noise_tolerance` (Enum: HIGH, MEDIUM, LOW)
-      - **Why (USP 6)**: Shor kitna bardash kar sakta hai. Music-lover ko music-lover ke saath denge.
-      - **Example**: `LOW` (Shaanti chahiye)
-  - `study_hours` (Enum: MORNING, AFTERNOON, LATE_NIGHT, FLEXIBLE)
-      - **Why (USP 6)**: Kab padhta hai. Late night studier ko late night ke saath match karenge.
-      - **Example**: `LATE_NIGHT`
-  - `lifestyle_attributes` (JSON)
-      - **Why (USP 6)**: Additional compatibility attributes jo enumerated fields mein fit nahi hote (smoker, vegetarian, etc.). Flexibility ke liye JSON format.
-      - **Example**: `{"smoker": false, "vegetarian": true, "pet_lover": false}`
-
-#### 1.3 Table: `StaffProfile`
-
-**Description**: Cook, Guard, Cleaner details.
-**Fields**:
-
-  - `user_id` (Foreign Key -> CustomUser)
-      - **Why**: Link to main User table.
-      - **Example**: `Cook's user_id`
-  - `staff_role` (Enum: COOK, GUARD, CLEANER, OTHER)
-      - **Why**: Job profile.
-      - **Example**: `COOK`
-  - `daily_rate` (Decimal)
-      - **Why**: Salary calculation basis.
-      - **Example**: `500.00`
-  - `assigned_property_id` (Foreign Key -> Property)
-      - **Why**: Where they work.
-      - **Example**: `Property UUID`
-  - `joining_date` (Date)
-      - **Why**: HR records.
-      - **Example**: `2025-01-01`
-
------
-
-## 🛏️ MODULE 2: PROPERTY & INVENTORY (App: `inventory`)
-
-### Purpose: Dukaan ka Maal (Rooms & Beds)
-
-Hamein pata hona chahiye ki hamare paas bechne ke liye kya hai.
-
-#### 2.0 Table: `Property`
-
-**Description**: Represents a PG branch.
+**Description**: Business profile for PG Owners (SuperAdmins).
 **Fields**:
 
   - `id` (UUID, Primary Key)
-      - **Why**: Unique ID for each PG branch.
-      - **Example**: `property_uuid`
-  - `name` (String)
-      - **Why**: Name of the PG.
-      - **Example**: `"Gokuldham PG 1"`
-  - `address` (Text)
-      - **Why**: Physical location.
-      - **Example**: `"123, Main Road, Kota"`
-  - `owner_id` (Foreign Key -> CustomUser)
-      - **Why**: Mulitple owners support.
-      - **Example**: `Owner's user_id`
-  - `manager_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Assigned manager.
-      - **Example**: `Manager's user_id`
-  - `current_hygiene_rating` (Decimal)
-      - **Why (USP 13)**: Public hygiene score.
-      - **Example**: `4.5`
-  - `preferred_language` (Enum: EN, HI, TE)
-      - **Why**: For staff app localization.
-      - **Example**: `HI`
+  - `user_id` (Foreign Key -> CustomUser)
+      - **Why**: Link to login credentials.
+  - `business_name` (String)
+      - **Why**: Name of the PG business.
+      - **Example**: `"Sharma PG works"`
+  - `gst_number` (String, Unique)
+      - **Why**: Tax compliance.
+  - `total_properties_count` (Integer)
+      - **Why**: System tracking.
 
-#### 2.1 Table: `Room`
+#### 1.3 Table: `TenantProfile`
 
-**Description**: Kamre ki details.
+**Description**: Student/Tenant specific details.
 **Fields**:
 
-  - `room_number` (String)
-      - **Why**: Manager ko physical location batane ke liye.
-      - **Example**: `"204-B"` (2nd Floor, Room 4)
-  - `floor` (Integer)
-      - **Why**: Filter lagane ke liye (e.g., "Mujhe ground floor chahiye").
-      - **Example**: `2`
-  - `capacity` (Integer)
-      - **Why**: Room mein kitne log reh sakte hain (1/2/3 sharing).
-      - **Example**: `2`
-  - `has_ac` (Boolean)
-      - **Why**: AC wala room hai ya nahi, pricing aur filtering ke liye.
-      - **Example**: `True`
-  - `has_balcony` (Boolean)
-      - **Why**: Balcony wala room hai ya nahi, premium feature.
-      - **Example**: `False`
-  - `base_rent` (Decimal)
-      - **Why (USP 4)**: Original rent amount, seasonal pricing calculate karne ke liye base.
-      - **Example**: `5000.00`
-  - `current_seasonal_rent` (Decimal)
-      - **Why (USP 4)**: **Dynamic Pricing**. Normal rent 5000 ho sakta hai, lekin agar June (peak season) hai toh hum is field ko update karke 6000 kar denge. Invoice yahan se price uthayega.
-      - **Example**: `6500.00`
-
-#### 2.2 Table: `Bed`
-
-**Description**: Asli product jo bikta hai. Ek room mein 2-3 beds ho sakte hain.
-**Fields**:
-
-  - `room_id` (Foreign Key -\> Room)
-      - **Why**: Ye bed kaunse kamre mein rakha hai?
-      - **Example**: `550e8400-e29b-41d4-a716-446655440010`
-  - `bed_label` (String)
-      - **Why**: Kamre mein kaunsa bed? Khidki wala (A) ya darwaze wala (B)?
-      - **Example**: `"A"`
-  - `public_uid` (UUID)
-      - **Why (USP 3)**: **Public Link Feature**. Hamein ek secret code chahiye taaki hum WhatsApp par link bhej sakein "smartpg.com/book/bed/abc-secret-code"
-      - **Example**: `550e8400-e29b-41d4-a716-446655440020`
-  - `is_occupied` (Boolean)
-      - **Why**: Ye bed khali hai ya bhara hua? Booking system ko pata hona chahiye.
-      - **Example**: `False` (Khali hai)
-  - `iot_meter_id` (String, Nullable)
-      - **Why (USP 5)**: Smart Electricity Billing ke liye har bed ka alag meter ID.
-      - **Example**: `"METER_204B_A"`
-
-#### 2.3 Table: `PricingRule`
-
-**Description**: Dynamic pricing rules for seasonal adjustments.
-**Fields**:
-
+  - `user_id` (OneToOne -> CustomUser)
   - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ke liye rule hai.
-      - **Example**: `Property UUID`
-  - `rule_name` (String)
-      - **Why**: Rule ka naam identify karne ke liye.
-      - **Example**: `"Summer Surge"`
-  - `start_month` (Integer)
-      - **Why**: Kab se rule apply hoga (1=January, 12=December).
-      - **Example**: `4` (April)
-  - `end_month` (Integer)
-      - **Why**: Kab tak rule apply hoga.
-      - **Example**: `6` (June)
-  - `price_multiplier` (Decimal)
-      - **Why**: Base rent ko kitna multiply karna hai.
-      - **Example**: `1.20` (20% increase)
+      - **Why**: Where they currently live.
+  - `room_id` (Foreign Key -> Room)
+      - **Why**: Which room.
+  - `bed_id` (Foreign Key -> Bed)
+      - **Why**: Which bed.
+  - `aadhaar_number` (String)
+      - **Why (USP 2)**: KYC compliance.
+  - `police_verification_status` (Enum: PENDING, SUBMITTED, VERIFIED, REJECTED)
+      - **Why (USP 2)**: Security status.
+  - `wallet_balance` (Decimal)
+      - **Why (USP 15)**: Cashless mess/fines.
+  - `pg_credit_score` (Integer, Default: 700)
+      - **Why (USP 10)**: Gamification of discipline.
+  - `guardian_name` & `guardian_phone` (String)
+      - **Why**: Emergency contact (fallback).
+  - `check_in_photos` (JSON)
+      - **Why**: Pre-occupancy condition proof.
+  - **AI Matching Preferences (USP 6)**:
+      - `sleep_schedule` (Early Bird/Night Owl)
+      - `dietary_preference` (Veg/Non-Veg)
+      - `cleanliness_level` (High/Med/Low)
+      - `smoking_habit` (Smoker/Non-Smoker)
 
-#### 2.4 Table: `ElectricityReading`
+#### 1.4 Table: `ParentStudentMapping` (NEW)
 
-**Description**: IoT meter readings for individual bed consumption.
+**Description**: Explicit link between Parent accounts and Student tenants.
 **Fields**:
 
-  - `bed_id` (Foreign Key -> Bed)
-      - **Why**: Kaunse bed ka reading hai.
-      - **Example**: `Bed UUID`
-  - `meter_id` (String)
-      - **Why**: Physical meter ka ID.
-      - **Example**: `"METER_204B_A"`
-  - `reading_kwh` (Decimal)
-      - **Why**: Kitni electricity consume hui.
-      - **Example**: `15.50` (units)
-  - `timestamp` (DateTime)
-      - **Why**: Kab reading li gayi.
-      - **Example**: `2025-01-15 18:30:00`
+  - `parent_user` (Foreign Key -> CustomUser)
+  - `student_tenant` (Foreign Key -> TenantProfile)
+  - `relationship` (Father, Mother, Guardian)
+  - `has_access` (Boolean)
+      - **Why**: Allow/Revoke access to student data.
+
+#### 1.5 Table: `StaffProfile`
+
+**Description**: Employees (Cook, Guard, etc.).
+**Fields**:
+
+  - `role` (Enum: COOK, GUARD, MANAGER, CLEANER)
+  - `salary` (Decimal)
+      - **Why**: Monthly payroll calculation.
+  - `employment_status` (ACTIVE, RESIGNED)
+      - **Why**: HR tracking.
+
+-----
+
+## 🛏️ MODULE 2: PROPERTY & INVENTORY (App: `properties`)
+
+### Purpose: Dukaan ka Maal (Rooms & Beds)
+
+#### 2.1 Table: `Property`
+
+**Description**: PG Branch details.
+**Fields**:
+
+  - `name`, `address`, `city`, `state`, `pincode`: Location details.
+  - `property_type` (Boys/Girls/Co-Ed): Target audience.
+  - `total_floors`: Building structure.
+  - `monthly_revenue`: Financial tracking.
+  - `hygiene_score`: Auto-calculated from inspections.
+  - `iot_enabled`: Feature flag (USP #5).
+  - `owner`: Link to OwnerProfile.
+
+#### 2.2 Table: `Room`
+
+**Description**: Individual rooms.
+**Fields**:
+
+  - `room_number`: Label (e.g., "101").
+  - `type` (Single/Double/Triple): Occupancy.
+  - `base_rent`: Pricing.
+  - `status` (Available/Occupied): Allocation logic.
+  - `carpet_area_sqft` & `window_count`: Amenities.
+
+#### 2.3 Table: `Bed`
+
+**Description**: Sellable unit.
+**Fields**:
+
+  - `label`: "A", "B".
+  - `is_occupied`: Status.
+  - `iot_meter_id`: Hardware link.
+  - `public_uid`: Sharing link (USP #3).
+
+#### 2.4 Table: `PricingRule`
+
+**Description**: Seasonal Pricing (USP #4).
+**Fields**:
+
+  - `rule_name`: "Summer Peak".
+  - `start_month`, `end_month`: Season.
+  - `price_multiplier`: 1.x logic.
 
 #### 2.5 Table: `Asset`
 
-**Description**: Physical assets like ACs, geysers tracking.
+**Description**: Physical inventory (AC, Geyser).
 **Fields**:
 
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka asset hai.
-      - **Example**: `Property UUID`
-  - `room_id` (Foreign Key -> Room, Nullable)
-      - **Why**: Kaunse room mein hai (common area ke liye null).
-      - **Example**: `Room UUID`
-  - `name` (String)
-      - **Why**: Asset ka naam.
-      - **Example**: `"1.5 Ton AC"`
-  - `qr_code` (String, Unique)
-      - **Why**: QR scan karke asset details dekh sakte hain.
-      - **Example**: `"QR_AC_001"`
-  - `purchase_date` (Date)
-      - **Why**: Kab khareeda tha.
-      - **Example**: `2024-01-15`
-  - `last_service_date` (Date, Nullable)
-      - **Why**: Last service kab hui thi.
-      - **Example**: `2024-12-01`
-  - `next_service_due_date` (Date, Nullable)
-      - **Why**: Next service kab due hai.
-      - **Example**: `2025-06-01`
+  - `name`, `qr_code`: Identification.
+  - `warranty_expiry_date`: Maintenance tracking.
+  - `service_frequency_days`: Schedule.
 
 #### 2.6 Table: `AssetServiceLog`
 
-**Description**: Service history of all assets.
+**Description**: Repair tracking.
 **Fields**:
 
-  - `asset_id` (Foreign Key -> Asset)
-      - **Why**: Kaunse asset ki service hui.
-      - **Example**: `Asset UUID`
-  - `service_date` (Date)
-      - **Why**: Service kab hui.
-      - **Example**: `2024-12-01`
-  - `cost` (Decimal)
-      - **Why**: Service mein kitna kharcha hua.
-      - **Example**: `500.00`
-  - `description` (Text)
-      - **Why**: Kya service hui.
-      - **Example**: `"AC gas refill and cleaning"`
-  - `serviced_by` (String)
-      - **Why**: Kisne service ki.
-      - **Example**: `"Sharma Electronics"`
-  - `bill_photo` (Image, Nullable)
-      - **Why**: Service bill ka photo.
-      - **Example**: `"asset_bills/ac_service_bill.jpg"`
+  - `asset_id`: Which item.
+  - `service_date`: When.
+  - `cost`: Expense.
+  - `technician_notes`: Diagnosis.
+  - `bill_photo`: Proof.
+
+#### 2.7 Table: `ElectricityReading`
+
+**Description**: IoT Energy Logs.
+**Fields**:
+
+  - `bed_id`: Specific user consumption.
+  - `reading_kwh`: Meter value.
+  - `timestamp`: Time of reading.
 
 -----
 
 ## 🏠 MODULE 3: TENANT LIFECYCLE (App: `bookings`)
 
-### Purpose: Student ka Safar (Booking to Exit)
-
-Student ka complete journey - booking se lekar exit tak.
+### Purpose: Student ka Safar
 
 #### 3.1 Table: `Booking`
 
-**Description**: Tenant ka stay record - main booking table.
+**Description**: Stay record.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique booking identifier.
-      - **Example**: `booking_uuid`
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunsa student book kar raha hai.
-      - **Example**: `Tenant's user_id`
-  - `bed_id` (Foreign Key -> Bed)
-      - **Why**: Kaunsa bed book kiya hai.
-      - **Example**: `Bed UUID`
-  - `start_date` (Date)
-      - **Why**: Kab se stay start hoga.
-      - **Example**: `2025-01-01`
-  - `end_date` (Date, Nullable)
-      - **Why**: Kab tak stay hai (null = ongoing).
-      - **Example**: `2025-12-31`
-  - `rent_amount` (Decimal)
-      - **Why**: Monthly rent amount.
-      - **Example**: `6500.00`
-  - `deposit_amount` (Decimal)
-      - **Why**: Security deposit amount.
-      - **Example**: `13000.00`
-  - `status` (Enum: ACTIVE, NOTICE_PERIOD, EXITED, CANCELLED)
-      - **Why**: Current booking status.
-      - **Example**: `ACTIVE`
-  - `is_zero_deposit` (Boolean)
-      - **Why (USP 8)**: Zero-deposit option liya hai ya nahi.
-      - **Example**: `True`
-  - `fintech_partner_name` (String, Nullable)
-      - **Why (USP 8)**: Kaunsa fintech partner (Slice, ZestMoney).
-      - **Example**: `"ZestMoney"`
-  - `fintech_loan_id` (String, Nullable)
-      - **Why (USP 8)**: Loan ID for tracking.
-      - **Example**: `"ZM123456789"`
-  - `notice_given_date` (Date, Nullable)
-      - **Why (USP 9)**: Kab notice diya tha.
-      - **Example**: `2025-11-01`
-  - `refund_amount` (Decimal, Nullable)
-      - **Why (USP 9)**: Kitna refund milega.
-      - **Example**: `12000.00`
-  - `refund_processed_date` (Date, Nullable)
-      - **Why (USP 9)**: Refund kab process hua.
-      - **Example**: `2025-12-05`
+  - `tenant_id`, `bed_id`.
+  - `start_date`, `end_date`.
+  - `security_deposit` & `rent_amount`.
+  - `is_zero_deposit`: Fintech flag (USP #8).
+  - `loan_status`: If zero deposit.
+  - `notice_given_date` & `planned_exit_date`.
+  - `refund_amount`: Settlement.
 
 #### 3.2 Table: `DigitalAgreement`
 
-**Description**: E-signed rental agreements.
+**Description**: Legal contracts.
 **Fields**:
 
-  - `booking_id` (Foreign Key -> Booking, Primary Key)
-      - **Why**: Kaunse booking ka agreement.
-      - **Example**: `Booking UUID`
-  - `agreement_file` (File)
-      - **Why**: PDF agreement file.
-      - **Example**: `"agreements/rahul_agreement.pdf"`
-  - `is_signed` (Boolean)
-      - **Why**: Sign ho gaya ya nahi.
-      - **Example**: `True`
-  - `signed_at` (DateTime, Nullable)
-      - **Why**: Kab sign kiya.
-      - **Example**: `2025-01-01 10:30:00`
+  - `agreement_file`: Signed PDF URL.
+  - `signature_hash`: Fraud prevention.
+  - `biometric_data` & `ip_address`: Auth signals.
+  - `is_signed`: Status.
+  - `signed_at`: Timestamp.
+
+#### 3.3 Table: `RoomChangeHistory`
+
+**Description**: Internal shifting logs.
+**Fields**:
+
+  - `previous_room`, `new_room`.
+  - `reason`: "AC issue", "Roommate fight".
+  - `admin_approved`: Authorization.
 
 -----
 
@@ -373,347 +241,129 @@ Student ka complete journey - booking se lekar exit tak.
 
 ### Purpose: Paisa-Paisaa (Money Management)
 
-Sabka hisab-kitab yahan hota hai.
-
 #### 4.1 Table: `Invoice`
 
-**Description**: Monthly bills for tenants.
+**Description**: Generated monthly bills.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique invoice identifier.
-      - **Example**: `invoice_uuid`
-  - `booking_id` (Foreign Key -> Booking)
-      - **Why**: Kaunse booking ka bill.
-      - **Example**: `Booking UUID`
-  - `issue_date` (Date)
-      - **Why**: Bill kab generate hua.
-      - **Example**: `2025-01-01`
-  - `due_date` (Date)
-      - **Why**: Payment kab tak karni hai.
-      - **Example**: `2025-01-10`
-  - `rent_amount` (Decimal)
-      - **Why**: Base rent amount.
-      - **Example**: `6500.00`
-  - `mess_charges` (Decimal)
-      - **Why**: Mess ka bill.
-      - **Example**: `2000.00`
-  - `electricity_charges` (Decimal)
-      - **Why**: Electricity consumption charges.
-      - **Example**: `300.00`
-  - `late_fee` (Decimal)
-      - **Why**: Late payment penalty.
-      - **Example**: `100.00`
-  - `total_amount` (Decimal)
-      - **Why**: Total payable amount.
-      - **Example**: `8900.00`
-  - `is_paid` (Boolean)
-      - **Why**: Payment ho gayi ya nahi.
-      - **Example**: `True`
-  - `paid_on` (Date, Nullable)
-      - **Why**: Kab payment hui.
-      - **Example**: `2025-01-05`
+  - `invoice_number`: Sequential ID (e.g., "INV-2025-001").
+  - `items`: JSON list (Rent, Mess, Electricity). 
+  - `tax_amount`, `discount_amount`: Financial adjustments.
+  - `status` (UNPAID, PAID, OVERDUE, PARTIAL): Payment lifecycle.
+  - `total_amount`: Final payable.
 
-#### 4.2 Table: `Transaction`
+#### 4.2 Table: `Payment` (Renamed from Transaction)
 
-**Description**: All financial movements log.
+**Description**: Incoming money logs.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique transaction identifier.
-      - **Example**: `txn_uuid`
-  - `user_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse user ka transaction.
-      - **Example**: `User UUID`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka transaction.
-      - **Example**: `Property UUID`
-  - `amount` (Decimal)
-      - **Why**: Transaction amount.
-      - **Example**: `6500.00`
-  - `category` (Enum: RENT, WALLET_RECHARGE, MESS_DEBIT, REFUND, EXPENSE, SALARY)
-      - **Why**: Transaction type identify karne ke liye.
-      - **Example**: `RENT`
-  - `is_credit` (Boolean)
-      - **Why**: Paisa aaya (True) ya gaya (False).
-      - **Example**: `True`
-  - `timestamp` (DateTime)
-      - **Why**: Kab transaction hua.
-      - **Example**: `2025-01-05 14:30:00`
-  - `description` (String)
-      - **Why**: Transaction details.
-      - **Example**: `"January rent payment"`
-  - `payment_gateway_txn_id` (String, Nullable)
-      - **Why**: Gateway transaction ID.
-      - **Example**: `"RAZORPAY_123456"`
-  - `invoice_id` (Foreign Key -> Invoice, Nullable)
-      - **Why**: Kaunse invoice ka payment.
-      - **Example**: `Invoice UUID`
+  - `transaction_id`: Bank/UPI Reference ID.
+  - `payment_method` (UPI, Cash, Bank Transfer).
+  - `status` (Success/Failed/Pending).
+  - `refund_ref_id`: Linked output transaction if refunded.
 
 #### 4.3 Table: `Expense`
 
-**Description**: PG operational expenses.
+**Description**: PG Operational costs.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique expense identifier.
-      - **Example**: `expense_uuid`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka expense.
-      - **Example**: `Property UUID`
-  - `category` (String)
-      - **Why**: Expense type.
-      - **Example**: `"Groceries"`
-  - `amount` (Decimal)
-      - **Why**: Expense amount.
-      - **Example**: `5000.00`
-  - `date` (Date)
-      - **Why**: Expense date.
-      - **Example**: `2025-01-15`
-  - `description` (Text)
-      - **Why**: Expense details.
-      - **Example**: `"Monthly grocery shopping for mess"`
-  - `receipt` (File, Nullable)
-      - **Why**: Receipt photo/PDF.
-      - **Example**: `"receipts/grocery_jan_2025.jpg"`
+  - `category` (Groceries, Maintenance, Salary).
+  - `payee_name`: Vendor or Person paid.
+  - `approved_by`: Manager/Owner who authorized this.
+  - `amount`: Cost incurred.
+
+#### 4.4 Table: `RefundTransaction` (NEW)
+
+**Description**: Outgoing refunds (Security Deposit/Excess).
+**Fields**:
+
+  - `booking_id`: Context.
+  - `refund_amount`: How much.
+  - `refund_type` (Security Deposit, Excess Rent).
+  - `status`: Processed or Pending.
 
 -----
 
 ## 🛡️ MODULE 5: OPERATIONS & SAFETY (App: `operations`)
 
-### Purpose: Rozana ka Kaam (Daily Operations)
-
-Complaint, safety, entry-exit sab yahan.
+### Purpose: Rozana ka Kaam
 
 #### 5.1 Table: `Complaint`
 
-**Description**: Tenant complaints management.
+**Description**: Tenant issues tracking.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique complaint identifier.
-      - **Example**: `complaint_uuid`
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kisne complaint ki.
-      - **Example**: `Tenant UUID`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ki complaint.
-      - **Example**: `Property UUID`
-  - `category` (String)
-      - **Why**: Complaint type.
-      - **Example**: `"AC not working"`
-  - `description` (Text)
-      - **Why**: Complaint details.
-      - **Example**: `"Room 204-B AC not cooling properly"`
-  - `status` (Enum: OPEN, IN_PROGRESS, RESOLVED)
-      - **Why**: Complaint status.
-      - **Example**: `OPEN`
-  - `created_at` (DateTime)
-      - **Why**: Kab complaint ki.
-      - **Example**: `2025-01-15 10:30:00`
-  - `resolved_at` (DateTime, Nullable)
-      - **Why**: Kab resolve hui.
-      - **Example**: `2025-01-16 15:00:00`
-  - `is_raised_by_bot` (Boolean)
-      - **Why (USP 14)**: AI chatbot se complaint aayi ya manual.
-      - **Example**: `False`
+  - `category` (Plumbing, Electrical, Food).
+  - `priority` (Low, Medium, High, Urgent).
+  - `image_url` & `video_url`: Visual proof (JSON).
+  - `assigned_to`: Specific staff member.
+  - `estimated_resolution_hours`: SLA tracking.
+  - `rating` & `feedback_comments`: Post-resolution satisfaction.
 
-#### 5.2 Table: `EntryLog`
+#### 5.2 Table: `EmergencyAlert` (Renamed from SOSAlert)
 
-**Description**: Biometric/QR entry-exit logs.
+**Description**: Panic button & Safety system (USP #11).
 **Fields**:
 
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaun entry/exit kar raha hai.
-      - **Example**: `Tenant UUID`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property mein.
-      - **Example**: `Property UUID`
-  - `timestamp` (DateTime)
-      - **Why**: Kab entry/exit hua.
-      - **Example**: `2025-01-15 23:30:00`
-  - `direction` (Enum: IN, OUT)
-      - **Why**: Andar aa raha ya bahar ja raha.
-      - **Example**: `IN`
-  - `entry_method` (Enum: BIOMETRIC, QR, MANUAL)
-      - **Why**: Kaise entry ki.
-      - **Example**: `QR`
-  - `is_late_entry` (Boolean)
-      - **Why (USP 12)**: Late night entry hai ya nahi.
-      - **Example**: `True`
-  - `parent_alert_sent` (Boolean)
-      - **Why (USP 12)**: Parent ko alert bheja ya nahi.
-      - **Example**: `True`
+  - `location_coordinates`: GPS Lat/Long.
+  - `type` (SOS_BUTTON, NIGHT_ENTRY, GEOFENCE_EXIT).
+  - `alert_sent_to`: List of notified User IDs (Parents, Wardens).
+  - `response_time_seconds`: Efficiency metric.
+  - `status`: Triggered -> Resolved.
 
-#### 5.3 Table: `Notice`
+#### 5.3 Table: `EntryLog`
 
-**Description**: Digital notice board messages.
+**Description**: Gatekeeping.
 **Fields**:
 
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka notice.
-      - **Example**: `Property UUID`
-  - `title` (String)
-      - **Why**: Notice heading.
-      - **Example**: `"Electricity Maintenance"`
-  - `body` (Text)
-      - **Why**: Notice content.
-      - **Example**: `"Power will be off from 2-4 PM tomorrow"`
-  - `created_at` (DateTime)
-      - **Why**: Kab notice publish hua.
-      - **Example**: `2025-01-15 09:00:00`
-  - `is_published` (Boolean)
-      - **Why**: Notice active hai ya nahi.
-      - **Example**: `True`
+  - `direction` (IN/OUT).
+  - `method` (Biometric, QR, FaceID).
+  - `device_id`: Which gate machine was used.
+  - `is_late_entry` & `parent_alert_sent` (USP #12): Automatic night flagging.
 
-#### 5.4 Table: `ChatLog`
+#### 5.4 Table: `Notice`
 
-**Description**: AI chatbot conversation logs.
+**Description**: Digital Board.
 **Fields**:
 
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kisne chat kiya.
-      - **Example**: `Tenant UUID`
-  - `message` (Text)
-      - **Why**: User ka question.
-      - **Example**: `"Mera rent kab due hai?"`
-  - `bot_response` (Text)
-      - **Why**: AI ka answer.
-      - **Example**: `"Aapka rent 10 January ko due hai"`
-  - `intent` (String, Nullable)
-      - **Why**: AI ne kya samjha.
-      - **Example**: `"rent_query"`
-  - `timestamp` (DateTime)
-      - **Why**: Kab chat hua.
-      - **Example**: `2025-01-15 16:45:00`
+  - `priority` (Normal/Urgent).
+  - `is_pinned`: Stick to top.
+  - `expires_at`: Auto-archive date.
 
-#### 5.5 Table: `SOSAlert`
+#### 5.5 Table: `ChatLog`
 
-**Description**: Emergency SOS alert system.
+**Description**: AI Chatbot history (USP #14).
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique SOS identifier.
-      - **Example**: `sos_uuid`
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kisne SOS trigger kiya.
-      - **Example**: `Tenant UUID`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property mein emergency.
-      - **Example**: `Property UUID`
-  - `latitude` (Decimal, Nullable)
-      - **Why**: GPS location latitude.
-      - **Example**: `26.9124`
-  - `longitude` (Decimal, Nullable)
-      - **Why**: GPS location longitude.
-      - **Example**: `75.7873`
-  - `location_accuracy` (Integer, Nullable)
-      - **Why**: GPS accuracy in meters.
-      - **Example**: `5`
-  - `message` (Text)
-      - **Why**: Emergency message.
-      - **Example**: `"Help needed in room 204-B"`
-  - `device_info` (JSON)
-      - **Why**: Device details for debugging.
-      - **Example**: `{"os": "Android", "version": "1.0.2"}`
-  - `status` (Enum: TRIGGERED, RESPONDING, RESOLVED, FALSE_ALARM)
-      - **Why**: SOS status.
-      - **Example**: `TRIGGERED`
-  - `triggered_at` (DateTime)
-      - **Why**: Kab SOS trigger hua.
-      - **Example**: `2025-01-15 22:30:00`
-  - `acknowledged_at` (DateTime, Nullable)
-      - **Why**: Kab acknowledge hua.
-      - **Example**: `2025-01-15 22:32:00`
-  - `resolved_at` (DateTime, Nullable)
-      - **Why**: Kab resolve hua.
-      - **Example**: `2025-01-15 22:45:00`
-  - `response_time_seconds` (Integer, Nullable)
-      - **Why**: Response time tracking.
-      - **Example**: `120`
-  - `first_responder_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Pehle kisne respond kiya.
-      - **Example**: `Manager UUID`
-  - `manager_notified` (Boolean)
-      - **Why**: Manager ko notify kiya ya nahi.
-      - **Example**: `True`
-  - `parent_notified` (Boolean)
-      - **Why**: Parent ko notify kiya ya nahi.
-      - **Example**: `True`
-  - `security_notified` (Boolean)
-      - **Why**: Security ko notify kiya ya nahi.
-      - **Example**: `True`
-  - `owner_notified` (Boolean)
-      - **Why**: Owner ko notify kiya ya nahi.
-      - **Example**: `False`
-  - `resolution_notes` (Text)
-      - **Why**: Kaise resolve hua.
-      - **Example**: `"False alarm - student pressed by mistake"`
-  - `is_genuine_emergency` (Boolean, Nullable)
-      - **Why**: Genuine emergency thi ya false alarm.
-      - **Example**: `False`
+  - `platform` (WhatsApp, In-App).
+  - `intent`: Classified intent (e.g., "rent_query").
+  - `bot_handled`: True if human didn't intervene.
 
 -----
 
 ## 🍽️ MODULE 6: SMART MESS (App: `mess`)
 
-### Purpose: Khana-Peena (Food Management)
-
-Mess menu aur daily meal selection.
+### Purpose: Smart Food Management
 
 #### 6.1 Table: `MessMenu`
 
-**Description**: Daily/weekly mess menu.
+**Description**: Daily food plan.
 **Fields**:
 
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka menu.
-      - **Example**: `Property UUID`
-  - `date` (Date)
-      - **Why**: Kaunse din ka menu.
-      - **Example**: `2025-01-15`
-  - `breakfast` (String, Nullable)
-      - **Why**: Breakfast items.
-      - **Example**: `"Poha, Tea, Banana"`
-  - `lunch` (String, Nullable)
-      - **Why**: Lunch items.
-      - **Example**: `"Dal, Rice, Sabzi, Roti"`
-  - `dinner` (String, Nullable)
-      - **Why**: Dinner items.
-      - **Example**: `"Rajma, Rice, Salad"`
-  - `price_breakfast` (Decimal)
-      - **Why**: Breakfast price.
-      - **Example**: `30.00`
-  - `price_lunch` (Decimal)
-      - **Why**: Lunch price.
-      - **Example**: `60.00`
-  - `price_dinner` (Decimal)
-      - **Why**: Dinner price.
-      - **Example**: `50.00`
+  - `breakfast_items`, `lunch_items`, `dinner_items`.
+  - `veg_items` & `non_veg_items`: JSON arrays for detailed tagging.
+  - `special_item`: Hyderabadi Biryani (Special attraction).
+  - `price_breakfast`, `price_lunch`, `price_dinner`: Pay-per-meal costs.
 
 #### 6.2 Table: `DailyMealSelection`
 
-**Description**: Tenant's daily meal choices.
+**Description**: User choices (opt-in/opt-out).
 **Fields**:
 
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse tenant ka selection.
-      - **Example**: `Tenant UUID`
-  - `menu_id` (Foreign Key -> MessMenu)
-      - **Why**: Kaunse din ka menu.
-      - **Example**: `Menu UUID`
-  - `breakfast_status` (Enum: EATING, SKIPPING)
-      - **Why**: Breakfast lega ya nahi.
-      - **Example**: `EATING`
-  - `lunch_status` (Enum: EATING, SKIPPING)
-      - **Why**: Lunch lega ya nahi.
-      - **Example**: `SKIPPING`
-  - `dinner_status` (Enum: EATING, SKIPPING)
-      - **Why**: Dinner lega ya nahi.
-      - **Example**: `EATING`
-  - `is_billed` (Boolean)
-      - **Why**: Wallet se paisa kata ya nahi.
-      - **Example**: `True`
+  - `meal_type` (Breakfast/Lunch/Dinner).
+  - `is_eating`: Boolean toggle.
+  - `cost_deducted`: Financial impact.
+  - `meal_item_selected`: e.g., "Omelette" vs "Boiled Egg".
 
 -----
 
@@ -721,884 +371,259 @@ Mess menu aur daily meal selection.
 
 ### Purpose: Naye Customer (Lead Management)
 
-Enquiry se booking tak ka process.
-
 #### 7.1 Table: `Lead`
 
 **Description**: Potential tenant enquiries.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique lead identifier.
-      - **Example**: `lead_uuid`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ke liye enquiry.
-      - **Example**: `Property UUID`
-  - `full_name` (String)
-      - **Why**: Lead ka naam.
-      - **Example**: `"Amit Sharma"`
-  - `phone_number` (String)
-      - **Why**: Contact number.
-      - **Example**: `"+919876543210"`
-  - `email` (Email, Nullable)
-      - **Why**: Email ID.
-      - **Example**: `"amit@example.com"`
-  - `status` (Enum: NEW, CONTACTED, VISITED, CONVERTED, LOST)
-      - **Why**: Lead status.
-      - **Example**: `NEW`
-  - `converted_tenant_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Agar convert ho gaya toh tenant ID.
-      - **Example**: `Tenant UUID`
-  - `notes` (Text)
-      - **Why**: Lead notes.
-      - **Example**: `"Interested in AC room, budget 7000"`
-  - `created_at` (DateTime)
-      - **Why**: Kab enquiry aayi.
-      - **Example**: `2025-01-15 11:30:00`
+  - `interest_level` (High, Medium, Low): Prioritization.
+  - `status` (New, Called, Visited, Converted, Lost).
+  - `budget` & `preferred_room_type`: Requirements.
+  - `source` (Walk-in, Referral, Ad): Marketing analytics.
+  - `assigned_to_manager`: Responsibility.
+  - `last_contacted`: Follow-up tracking.
 
 -----
 
 ## 🔔 MODULE 8: NOTIFICATIONS (App: `notifications`)
 
-### Purpose: Khabar-Khabar (Communication)
+### Purpose: Communication Backbone
 
-SMS, Email, Push notifications.
+#### 8.1 Table: `Notification` (Renamed from NotificationLog)
 
-#### 8.1 Table: `NotificationLog`
-
-**Description**: All sent notifications log.
+**Description**: History of sent messages.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique notification identifier.
-      - **Example**: `notification_uuid`
-  - `user_id` (Foreign Key -> CustomUser)
-      - **Why**: Kisko notification bheja.
-      - **Example**: `User UUID`
-  - `notification_type` (Enum: SMS, EMAIL, PUSH, WHATSAPP)
-      - **Why**: Notification type.
-      - **Example**: `SMS`
-  - `category` (Enum: RENT_REMINDER, PAYMENT_SUCCESS, COMPLAINT_UPDATE, NIGHT_ALERT, SOS_ALERT, NOTICE, GENERAL)
-      - **Why**: Notification category.
-      - **Example**: `RENT_REMINDER`
-  - `title` (String)
-      - **Why**: Notification title.
-      - **Example**: `"Rent Due Reminder"`
-  - `message` (Text)
-      - **Why**: Notification content.
-      - **Example**: `"Your rent is due on 10th January"`
-  - `is_sent` (Boolean)
-      - **Why**: Successfully sent ya nahi.
-      - **Example**: `True`
-  - `sent_at` (DateTime, Nullable)
-      - **Why**: Kab send hua.
-      - **Example**: `2025-01-08 09:00:00`
-  - `created_at` (DateTime)
-      - **Why**: Kab create hua.
-      - **Example**: `2025-01-08 08:59:00`
+  - `channel` (SMS, WhatsApp, Email, Push).
+  - `action_url`: Deep link (e.g., "Pay Now").
+  - `read_at`: Read receipt timestamp.
+  - `notification_type`: e.g., "RENT_DUE".
 
 #### 8.2 Table: `FCMToken`
 
-**Description**: Firebase push notification tokens.
+**Description**: Push notification handles.
 **Fields**:
 
-  - `user_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse user ka token.
-      - **Example**: `User UUID`
-  - `token` (String, Unique)
-      - **Why**: FCM token string.
-      - **Example**: `"fcm_token_string_here"`
-  - `device_type` (Enum: ANDROID, IOS, WEB)
-      - **Why**: Device type.
-      - **Example**: `ANDROID`
-  - `is_active` (Boolean)
-      - **Why**: Token active hai ya nahi.
-      - **Example**: `True`
-  - `created_at` (DateTime)
-      - **Why**: Kab token create hua.
-      - **Example**: `2025-01-01 10:00:00`
-  - `updated_at` (DateTime)
-      - **Why**: Last update time.
-      - **Example**: `2025-01-15 14:30:00`
+  - `token`: Firebase identifier.
+  - `device_type` (Android, iOS, Web).
+
+#### 8.3 Table: `MessageTemplate` (NEW)
+
+**Description**: Standardized message content.
+**Fields**:
+
+  - `code`: Unique template ID (e.g., "WELCOME_SMS").
+  - `content`: "Hello {{name}}, welcome to Smart PG!".
+  - `variables`: JSON list of placeholders.
+  - `channel`: Which channel supports this template.
 
 -----
 
 ## 👥 MODULE 9: VISITORS (App: `visitors`)
 
-### Purpose: Mehman-Nawazi (Guest Management)
-
-Visitor entry approval system.
+### Purpose: Mehman-Nawazi
 
 #### 9.1 Table: `VisitorRequest`
 
-**Description**: Visitor entry requests.
+**Description**: Gate entry management.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique visitor request identifier.
-      - **Example**: `visitor_uuid`
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse tenant ka visitor.
-      - **Example**: `Tenant UUID`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property mein visit.
-      - **Example**: `Property UUID`
-  - `visitor_name` (String)
-      - **Why**: Visitor ka naam.
-      - **Example**: `"Rajesh Sharma"`
-  - `visitor_phone` (String)
-      - **Why**: Visitor ka phone.
-      - **Example**: `"+919876543210"`
-  - `visitor_photo` (Image, Nullable)
-      - **Why**: Visitor ki photo.
-      - **Example**: `"visitors/rajesh_photo.jpg"`
-  - `purpose` (String)
-      - **Why**: Visit ka purpose.
-      - **Example**: `"Family visit"`
-  - `status` (Enum: PENDING, APPROVED, REJECTED, CHECKED_OUT)
-      - **Why**: Request status.
-      - **Example**: `APPROVED`
-  - `requested_at` (DateTime)
-      - **Why**: Kab request ki.
-      - **Example**: `2025-01-15 10:00:00`
-  - `approved_at` (DateTime, Nullable)
-      - **Why**: Kab approve hua.
-      - **Example**: `2025-01-15 10:15:00`
-  - `check_in_time` (DateTime, Nullable)
-      - **Why**: Kab entry hui.
-      - **Example**: `2025-01-15 11:00:00`
-  - `check_out_time` (DateTime, Nullable)
-      - **Why**: Kab exit hua.
-      - **Example**: `2025-01-15 18:00:00`
-  - `guard_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Kaunse guard ne process kiya.
-      - **Example**: `Guard UUID`
+  - `visitor_id_proof_type` & `number`: Security verification.
+  - `photo_url`: Webcam capture at gate.
+  - `approved_by`: Name of approver (Tenant/Warden).
+  - `status` (Pending -> Approved -> Checked In -> Checked Out).
+  - `check_in`, `check_out`: Timestamps.
 
 -----
 
 ## 📦 MODULE 10: INVENTORY (App: `inventory`)
 
-### Purpose: Rasoi ka Maal (Kitchen Stock)
-
-Kitchen inventory management.
+### Purpose: Kitchen & Asset Stock
 
 #### 10.1 Table: `InventoryItem`
 
-**Description**: Kitchen stock items.
+**Description**: Stock catalog.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique item identifier.
-      - **Example**: `item_uuid`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka stock.
-      - **Example**: `Property UUID`
-  - `item_name` (String)
-      - **Why**: Item ka naam.
-      - **Example**: `"Rice"`
-  - `category` (String)
-      - **Why**: Item category.
-      - **Example**: `"Groceries"`
-  - `current_quantity` (Decimal)
-      - **Why**: Current stock quantity.
-      - **Example**: `25.50`
-  - `unit` (Enum: KG, LITER, PIECE, PACKET)
-      - **Why**: Measurement unit.
-      - **Example**: `KG`
-  - `minimum_threshold` (Decimal)
-      - **Why**: Minimum stock alert level.
-      - **Example**: `5.00`
-  - `last_restocked_date` (Date, Nullable)
-      - **Why**: Last restock date.
-      - **Example**: `2025-01-10`
+  - `category` (Grocery, Consumables, Asset).
+  - `min_threshold`: Alert level.
+  - `supplier_name`: Source vendor.
+  - `status` (In Stock, Low Stock, Out of Stock).
+  - `cost_per_unit`: Valuation.
 
 #### 10.2 Table: `InventoryTransaction`
 
-**Description**: Stock movement logs.
+**Description**: Stock flow.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique transaction identifier.
-      - **Example**: `inv_txn_uuid`
-  - `item_id` (Foreign Key -> InventoryItem)
-      - **Why**: Kaunse item ka transaction.
-      - **Example**: `Item UUID`
-  - `transaction_type` (Enum: PURCHASE, CONSUMPTION, WASTAGE, ADJUSTMENT)
-      - **Why**: Transaction type.
-      - **Example**: `PURCHASE`
-  - `quantity` (Decimal)
-      - **Why**: Quantity moved.
-      - **Example**: `10.00`
-  - `date` (Date)
-      - **Why**: Transaction date.
-      - **Example**: `2025-01-15`
-  - `notes` (Text)
-      - **Why**: Transaction notes.
-      - **Example**: `"Monthly grocery purchase"`
-  - `recorded_by_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Kisne record kiya.
-      - **Example**: `Staff UUID`
+  - `transaction_type` (Purchase, Consumption, Wastage).
+  - `quantity`: +/- adjustment.
+  - `notes`: Reason for adjustment (e.g., "Spoilt milk").
 
 -----
 
 ## 💼 MODULE 11: PAYROLL (App: `payroll`)
 
-### Purpose: Karamchari ka Hisab (Staff Management)
-
-Staff attendance and salary.
+### Purpose: Karamchari ka Hisab
 
 #### 11.1 Table: `StaffAttendance`
 
-**Description**: Daily staff attendance.
+**Description**: Daily punch-in/out.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique attendance identifier.
-      - **Example**: `attendance_uuid`
-  - `staff_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse staff ka attendance.
-      - **Example**: `Staff UUID`
-  - `date` (Date)
-      - **Why**: Attendance date.
-      - **Example**: `2025-01-15`
-  - `status` (Enum: PRESENT, ABSENT, HALF_DAY, LEAVE)
-      - **Why**: Attendance status.
-      - **Example**: `PRESENT`
-  - `check_in_time` (Time, Nullable)
-      - **Why**: Check-in time.
-      - **Example**: `08:30:00`
-  - `check_out_time` (Time, Nullable)
-      - **Why**: Check-out time.
-      - **Example**: `18:00:00`
-  - `selfie_photo` (Image, Nullable)
-      - **Why**: Attendance selfie.
-      - **Example**: `"staff_attendance/cook_selfie.jpg"`
-  - `notes` (Text)
-      - **Why**: Attendance notes.
-      - **Example**: `"Late due to traffic"`
+  - `status` (Present, Absent, Leave, Half-Day).
+  - `check_in_time`, `check_out_time`: Work hours.
+  - `selfie_url`: Geo-fenced attendance proof.
+  - `gps_location`: Location verification.
+  - `remarks`: Late arrival reasons etc.
 
 #### 11.2 Table: `SalaryPayment`
 
-**Description**: Monthly salary payments.
+**Description**: Staff payouts.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique salary payment identifier.
-      - **Example**: `salary_uuid`
-  - `staff_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse staff ka salary.
-      - **Example**: `Staff UUID`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka staff.
-      - **Example**: `Property UUID`
-  - `month` (Date)
-      - **Why**: Salary month (first day).
-      - **Example**: `2025-01-01`
-  - `days_worked` (Decimal)
-      - **Why**: Kitne din kaam kiya.
-      - **Example**: `26.00`
-  - `daily_rate` (Decimal)
-      - **Why**: Per day salary rate.
-      - **Example**: `500.00`
-  - `gross_salary` (Decimal)
-      - **Why**: Total salary before deductions.
-      - **Example**: `13000.00`
-  - `deductions` (Decimal)
-      - **Why**: Deductions (advance, etc.).
-      - **Example**: `1000.00`
-  - `net_salary` (Decimal)
-      - **Why**: Final salary amount.
-      - **Example**: `12000.00`
-  - `payment_date` (Date)
-      - **Why**: Payment date.
-      - **Example**: `2025-02-01`
-  - `payment_mode` (Enum: CASH, BANK, UPI)
-      - **Why**: Payment method.
-      - **Example**: `UPI`
-  - `transaction_reference` (String, Nullable)
-      - **Why**: Payment reference.
-      - **Example**: `"UPI_REF_123456"`
+  - `month_year`: Identifying period (e.g., "Jan 2024").
+  - `base_amount`, `bonus`, `deductions`: Calculation breakdown.
+  - `net_amount`: Final paid.
+  - `status`: Pending -> Paid.
+  - `transaction_id`: Bank reference.
 
 -----
 
 ## 🧹 MODULE 12: HYGIENE (App: `hygiene`)
 
-### Purpose: Safai-Sutharai (Cleanliness Tracking)
-
-Hygiene inspection and ratings.
+### Purpose: Safai-Sutharai
 
 #### 12.1 Table: `HygieneInspection`
 
-**Description**: Weekly hygiene inspections.
+**Description**: Quality checks.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique inspection identifier.
-      - **Example**: `inspection_uuid`
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Kaunse property ka inspection.
-      - **Example**: `Property UUID`
-  - `inspection_date` (Date)
-      - **Why**: Inspection date.
-      - **Example**: `2025-01-15`
-  - `inspector_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Kisne inspection kiya.
-      - **Example**: `Manager UUID`
-  - `cleanliness_score` (Integer)
-      - **Why**: Cleanliness score out of 10.
-      - **Example**: `8`
-  - `kitchen_score` (Integer)
-      - **Why**: Kitchen score out of 10.
-      - **Example**: `9`
-  - `bathroom_score` (Integer)
-      - **Why**: Bathroom score out of 10.
-      - **Example**: `7`
-  - `common_area_score` (Integer)
-      - **Why**: Common area score out of 10.
-      - **Example**: `8`
-  - `overall_rating` (Decimal)
-      - **Why**: Average rating out of 5.
-      - **Example**: `4.0`
-  - `photos` (JSON)
-      - **Why**: Inspection photos list.
-      - **Example**: `["hygiene/kitchen_jan15.jpg", "hygiene/bathroom_jan15.jpg"]`
-  - `remarks` (Text)
-      - **Why**: Inspection remarks.
-      - **Example**: `"Kitchen needs deep cleaning"`
+  - `area` (Kitchen, Common Area, Room, Washroom).
+  - `score_out_of_5`: Quantitative metric.
+  - `photo_proof_urls`: Evidence of cleanliness/dirtiness.
+  - `issues_found`: "Tap leaking", "Dusty fan".
+  - `action_taken`: Remediations.
 
 -----
 
-## 📝 MODULE 13: FEEDBACK (App: `feedback`)
+## 🔍 MODULE 13: AUDIT (App: `audit`)
 
-### Purpose: Raay-Sujhav (Feedback Collection)
+### Purpose: Nigarani & Security
 
-Tenant feedback and ratings.
+#### 13.1 Table: `AuditLog`
 
-#### 13.1 Table: `ComplaintFeedback`
-
-**Description**: Feedback on resolved complaints.
+**Description**: Who did what and when.
 **Fields**:
 
-  - `complaint_id` (Foreign Key -> Complaint, Primary Key)
-      - **Why**: Kaunse complaint ka feedback.
-      - **Example**: `Complaint UUID`
-  - `rating` (Integer)
-      - **Why**: Rating 1 to 5.
-      - **Example**: `4`
-  - `feedback_text` (Text)
-      - **Why**: Feedback comments.
-      - **Example**: `"Quick resolution, satisfied"`
-  - `submitted_at` (DateTime)
-      - **Why**: Feedback submission time.
-      - **Example**: `2025-01-16 10:30:00`
-
-#### 13.2 Table: `MessFeedback`
-
-**Description**: Daily mess food feedback.
-**Fields**:
-
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique feedback identifier.
-      - **Example**: `mess_feedback_uuid`
-  - `tenant_id` (Foreign Key -> CustomUser)
-      - **Why**: Kisne feedback diya.
-      - **Example**: `Tenant UUID`
-  - `menu_id` (Foreign Key -> MessMenu)
-      - **Why**: Kaunse menu ka feedback.
-      - **Example**: `Menu UUID`
-  - `meal_type` (Enum: BREAKFAST, LUNCH, DINNER)
-      - **Why**: Kaunsa meal.
-      - **Example**: `LUNCH`
-  - `rating` (Integer)
-      - **Why**: Rating 1 to 5.
-      - **Example**: `3`
-  - `feedback_text` (Text)
-      - **Why**: Feedback comments.
-      - **Example**: `"Dal was too salty"`
-  - `submitted_at` (DateTime)
-      - **Why**: Feedback time.
-      - **Example**: `2025-01-15 14:30:00`
+  - `action_type`: (Login, Payment, SOS_Trigger, Delete).
+  - `model_name` & `object_id`: Target resource.
+  - `changes`: JSON diff (Before vs After).
+  - `ip_address` & `user_agent`: Digital footprint.
 
 -----
 
-## 🔍 MODULE 14: AUDIT (App: `audit`)
+## 🎓 MODULE 14: ALUMNI (App: `alumni`)
 
-### Purpose: Nigarani (System Monitoring)
+### Purpose: Purane Vidyarthi
 
-All system activities tracking.
+#### 14.1 Table: `AlumniProfile`
 
-#### 14.1 Table: `AuditLog`
-
-**Description**: Comprehensive audit trail.
+**Description**: Life after PG.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique audit log identifier.
-      - **Example**: `audit_uuid`
-  - `user_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Kisne action kiya.
-      - **Example**: `User UUID`
-  - `action_type` (Enum: CREATE, UPDATE, DELETE, LOGIN, LOGOUT, PAYMENT, REFUND)
-      - **Why**: Action type.
-      - **Example**: `PAYMENT`
-  - `model_name` (String)
-      - **Why**: Kaunsa model affected.
-      - **Example**: `"Invoice"`
-  - `object_id` (String)
-      - **Why**: Object ID.
-      - **Example**: `"invoice_uuid"`
-  - `changes` (JSON)
-      - **Why**: Before/after values.
-      - **Example**: `{"is_paid": {"before": false, "after": true}}`
-  - `ip_address` (IP, Nullable)
-      - **Why**: User IP address.
-      - **Example**: `"192.168.1.100"`
-  - `timestamp` (DateTime)
-      - **Why**: Action timestamp.
-      - **Example**: `2025-01-15 14:30:00`
+  - `current_company` & `designation`: Career progress.
+  - `willing_to_mentor`: Giving back to community (USP #13).
+  - `graduation_year`: Batch tracking.
+
+#### 14.2 Table: `JobReferral`
+
+**Description**: Community hiring.
+**Fields**:
+
+  - `role_title`, `company_name`: Job details.
+  - `apply_link`: How to apply.
+  - `status` (Active, Filled): Listing lifecycle.
 
 -----
 
-## 🎓 MODULE 15: ALUMNI (App: `alumni`)
+## 💳 MODULE 15: SAAS (App: `saas`)
 
-### Purpose: Purane Vidyarthi (Alumni Network)
+### Purpose: Business Model
 
-Ex-tenants network and job referrals.
+#### 15.1 Table: `SubscriptionPlan`
 
-#### 15.1 Table: `AlumniProfile`
-
-**Description**: Ex-tenant profiles.
+**Description**: SaaS Plans.
 **Fields**:
 
-  - `user_id` (Foreign Key -> CustomUser, Primary Key)
-      - **Why**: Kaunsa ex-tenant.
-      - **Example**: `User UUID`
-  - `current_company` (String, Nullable)
-      - **Why**: Current company name.
-      - **Example**: `"TCS"`
-  - `current_position` (String, Nullable)
-      - **Why**: Current job position.
-      - **Example**: `"Software Engineer"`
-  - `linkedin_url` (URL, Nullable)
-      - **Why**: LinkedIn profile.
-      - **Example**: `"https://linkedin.com/in/rahul"`
-  - `is_open_to_referrals` (Boolean)
-      - **Why**: Referral dene ko ready hai ya nahi.
-      - **Example**: `True`
-  - `exit_date` (Date)
-      - **Why**: PG se kab nikla.
-      - **Example**: `2024-12-31`
-  - `properties_stayed` (ManyToMany -> Property)
-      - **Why**: Kahan-kahan raha tha.
-      - **Example**: `[Property1_UUID, Property2_UUID]`
+  - `plan_name`: "Gold".
+  - `price`: Monthly cost.
+  - `limits`: Max beds/properties.
 
-#### 15.2 Table: `JobReferral`
+#### 15.2 Table: `SaasSubscription`
 
-**Description**: Job referral requests.
+**Description**: Owner billing.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique referral identifier.
-      - **Example**: `referral_uuid`
-  - `requester_id` (Foreign Key -> CustomUser)
-      - **Why**: Kisne referral manga.
-      - **Example**: `Tenant UUID`
-  - `alumni_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse alumni se manga.
-      - **Example**: `Alumni UUID`
-  - `company_name` (String)
-      - **Why**: Company name.
-      - **Example**: `"Infosys"`
-  - `position` (String)
-      - **Why**: Job position.
-      - **Example**: `"Java Developer"`
-  - `message` (Text)
-      - **Why**: Referral request message.
-      - **Example**: `"Please refer me for Java developer role"`
-  - `status` (Enum: REQUESTED, ACCEPTED, REJECTED, COMPLETED)
-      - **Why**: Referral status.
-      - **Example**: `ACCEPTED`
-  - `created_at` (DateTime)
-      - **Why**: Request time.
-      - **Example**: `2025-01-15 10:00:00`
-  - `updated_at` (DateTime)
-      - **Why**: Last update time.
-      - **Example**: `2025-01-16 14:30:00`
+  - `owner_id`, `plan_id`.
+  - `start_date`, `expiry_date`.
+  - `status` (Active/Expired).
+
+#### 15.3 Table: `AppVersion`
+
+**Description**: Forced Update Force.
+**Fields**:
+
+  - `platform` (Android/iOS).
+  - `version_code` (e.g. 102).
+  - `is_mandatory`: Block old apps?
 
 -----
 
-## 💳 MODULE 16: SAAS (App: `saas`)
+## 📊 MODULE 16: REPORTS (App: `reports`)
 
-### Purpose: Vyavasaya Model (Business Model)
+### Purpose: Riport-Patrak
 
-Subscription plans and app versions.
+#### 16.1 Table: `GeneratedReport`
 
-#### 16.1 Table: `SubscriptionPlan`
-
-**Description**: SaaS subscription plans.
+**Description**: Async report archives.
 **Fields**:
 
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique plan identifier.
-      - **Example**: `plan_uuid`
-  - `name` (String)
-      - **Why**: Plan name.
-      - **Example**: `"Gold Plan"`
-  - `price_per_month` (Decimal)
-      - **Why**: Monthly price.
-      - **Example**: `2999.00`
-  - `max_properties` (Integer)
-      - **Why**: Maximum properties allowed.
-      - **Example**: `5`
-  - `max_rooms` (Integer)
-      - **Why**: Maximum total rooms.
-      - **Example**: `100`
-  - `features` (JSON)
-      - **Why**: Feature flags.
-      - **Example**: `{"crm": true, "alumni": true, "reports": true}`
-  - `is_active` (Boolean)
-      - **Why**: Plan active hai ya nahi.
-      - **Example**: `True`
-
-#### 16.2 Table: `PropertySubscription`
-
-**Description**: Owner subscription status.
-**Fields**:
-
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique subscription identifier.
-      - **Example**: `subscription_uuid`
-  - `owner_id` (Foreign Key -> CustomUser)
-      - **Why**: Kaunse owner ka subscription.
-      - **Example**: `Owner UUID`
-  - `plan_id` (Foreign Key -> SubscriptionPlan)
-      - **Why**: Kaunsa plan liya hai.
-      - **Example**: `Plan UUID`
-  - `status` (Enum: ACTIVE, EXPIRED, CANCELLED, TRIAL)
-      - **Why**: Subscription status.
-      - **Example**: `ACTIVE`
-  - `start_date` (Date)
-      - **Why**: Subscription start date.
-      - **Example**: `2025-01-01`
-  - `end_date` (Date)
-      - **Why**: Subscription end date.
-      - **Example**: `2025-12-31`
-  - `auto_renew` (Boolean)
-      - **Why**: Auto renewal enabled.
-      - **Example**: `True`
-
-#### 16.3 Table: `AppVersion`
-
-**Description**: App version management.
-**Fields**:
-
-  - `platform` (Enum: ANDROID, IOS)
-      - **Why**: Platform type.
-      - **Example**: `ANDROID`
-  - `version_code` (Integer)
-      - **Why**: Version code number.
-      - **Example**: `102`
-  - `version_name` (String)
-      - **Why**: Version name.
-      - **Example**: `"1.0.2"`
-  - `is_mandatory` (Boolean)
-      - **Why**: Force update required.
-      - **Example**: `False`
-  - `release_date` (Date)
-      - **Why**: Release date.
-      - **Example**: `2025-01-15`
-
------
-
-## 📊 MODULE 17: REPORTS (App: `reports`)
-
-### Purpose: Riport-Patrak (Analytics)
-
-Generated reports storage.
-
-#### 17.1 Table: `GeneratedReport`
-
-**Description**: Generated Excel/PDF reports.
-**Fields**:
-
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique report identifier.
-      - **Example**: `report_uuid`
-  - `property_id` (Foreign Key -> Property, Nullable)
-      - **Why**: Kaunse property ka report.
-      - **Example**: `Property UUID`
-  - `report_type` (Enum: MONTHLY_RENT, EXPENSE, GST, OCCUPANCY, STAFF_PAYROLL)
-      - **Why**: Report type.
-      - **Example**: `MONTHLY_RENT`
-  - `generated_by_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Kisne generate kiya.
-      - **Example**: `Manager UUID`
-  - `file` (File)
-      - **Why**: Report file.
-      - **Example**: `"reports/rent_jan_2025.xlsx"`
-  - `start_date` (Date)
-      - **Why**: Report start date.
-      - **Example**: `2025-01-01`
-  - `end_date` (Date)
-      - **Why**: Report end date.
-      - **Example**: `2025-01-31`
-  - `created_at` (DateTime)
-      - **Why**: Report generation time.
-      - **Example**: `2025-02-01 09:00:00`
-
------
-
-## 🌐 MODULE 18: LOCALIZATION (App: `localization`)
-
-### Purpose: Bhasha-Anuvad (Language Support)
-
-Multi-language translations.
-
-#### 18.1 Table: `TranslationString`
-
-**Description**: UI text translations.
-**Fields**:
-
-  - `id` (UUID, Primary Key)
-      - **Why**: Unique translation identifier.
-      - **Example**: `translation_uuid`
-  - `module` (String)
-      - **Why**: App module name.
-      - **Example**: `"mess"`
-  - `key` (String)
-      - **Why**: Translation key.
-      - **Example**: `"book_meal"`
-  - `language` (Enum: en, hi, ta, te, kn, bn)
-      - **Why**: Target language.
-      - **Example**: `hi`
-  - `value` (Text)
-      - **Why**: Translated text.
-      - **Example**: `"खाना बुक करें"`
-  - `created_at` (DateTime)
-      - **Why**: Creation time.
-      - **Example**: `2025-01-01 10:00:00`
-  - `updated_at` (DateTime)
-      - **Why**: Last update time.
-      - **Example**: `2025-01-15 14:30:00`
-  - `updated_by_id` (Foreign Key -> CustomUser, Nullable)
-      - **Why**: Kisne update kiya.
-      - **Example**: `Admin UUID`
+  - `report_type`: Revenue, Occupancy, Expense.
+  - `file_url`: S3 link to downloadable PDF/Excel.
+  - `generated_by`: User who requested it.
 
 -----
 
 ## 📋 SUMMARY
 
-### **Total Apps: 18**
-1. users (User Management & Auth)
-2. properties (Property & Inventory)
-3. bookings (Tenant Lifecycle)
-4. finance (Finance Management)
-5. operations (Operations & Safety)
-6. mess (Smart Mess)
-7. crm (CRM & Leads)
-8. notifications (Notifications)
-9. visitors (Visitor Management)
-10. inventory (Kitchen Inventory)
-11. payroll (Staff & Payroll)
-12. hygiene (Hygiene Tracking)
-13. feedback (Feedback Collection)
-14. audit (System Monitoring)
-15. alumni (Alumni Network)
-16. saas (SaaS Business Model)
-17. reports (Analytics & Reports)
-18. localization (Language Support)
+### **Total Apps: 16 (Database Backed)**
+1. users
+2. properties
+3. bookings
+4. finance
+5. operations
+6. mess
+7. crm
+8. notifications
+9. visitors
+10. inventory
+11. payroll
+12. hygiene
+13. audit
+14. alumni
+15. saas
+16. reports
 
-### **Total Models: 41**
+(Note: `feedback` merged into relevant modules; `localization` is config-based).
 
-| App | Models Count | Key Models |
-|-----|--------------|------------|
-| users | 3 | CustomUser, TenantProfile, StaffProfile |
-| properties | 7 | Property, Room, Bed, PricingRule, Asset, ElectricityReading, AssetServiceLog |
-| bookings | 2 | Booking, DigitalAgreement |
-| finance | 3 | Invoice, Transaction, Expense |
-| operations | 5 | Complaint, EntryLog, Notice, ChatLog, SOSAlert |
-| mess | 2 | MessMenu, DailyMealSelection |
-| crm | 1 | Lead |
-| notifications | 2 | NotificationLog, FCMToken |
-| visitors | 1 | VisitorRequest |
-| inventory | 2 | InventoryItem, InventoryTransaction |
-| payroll | 2 | StaffAttendance, SalaryPayment |
-| hygiene | 1 | HygieneInspection |
-| feedback | 2 | ComplaintFeedback, MessFeedback |
-| audit | 1 | AuditLog |
-| alumni | 2 | AlumniProfile, JobReferral |
-| saas | 3 | SubscriptionPlan, PropertySubscription, AppVersion |
-| reports | 1 | GeneratedReport |
-| localization | 1 | TranslationString |
+### **Key Database Stats**
+- **Strictly Normalized**: 3NF compliance where possible.
+- **JSON Usage**: Strategic use for flexible fields (Items, Photos, Meta).
+- **Audit Ready**: Every critical action is verifiable.
+- **Scalable**: UUIDs used everywhere instead of Integers.
+- **Modular**: Apps are loosely coupled for independent scaling.
 
-### **Feature Coverage: 100% ✅**
-
-**All 33+ Features Covered:**
-- ✅ All 6 Core Modules
-- ✅ All 15 USP Features (AI Compatibility, Zero-Deposit, SOS, etc.)
-- ✅ All 9 Advanced Features (Multi-Property, CRM, Alumni, etc.)
-- ✅ All 9 Technical Features (Notifications, Localization, Audit, etc.)
-
-### **Key Business Logic Explained:**
-
-1. **Multi-Tenant Architecture**: Each property can have multiple owners/managers
-2. **Dynamic Pricing**: Seasonal rent adjustments through PricingRule
-3. **Smart Billing**: IoT-based electricity billing per bed
-4. **Parent Portal**: Guardian access to student data
-5. **Zero-Deposit**: Fintech integration for deposit alternatives
-6. **AI Compatibility**: Detailed preference matching for roommates
-7. **SOS System**: Comprehensive emergency alert system
-8. **Wallet System**: Pay-per-day mess billing
-9. **Digital Agreements**: E-signed rental contracts
-10. **Audit Trail**: Complete system activity logging
-
------
-
-**📝 Document Status:** ✅ COMPLETE & SYNCHRONIZED  
-**📅 Last Updated:** January 2025  
-**🎯 Total Fields Documented:** 200+ across 41 models  
-**✅ Sync Status:** 100% aligned with All_Database_Tables_Models.mdhttps://smartpg.com/book/bed/abc-secret-code)". Isse bina login kiye banda bed dekh sakta hai.
-      - **Example**: `550e8400-e29b-41d4-a716-446655440000`
-  - `iot_meter_id` (String)
-      - **Why (USP 5)**: Har bed ka apna bijli meter hai. Ye uska Hardware Serial Number hai taaki hum reading fetch kar sakein.
-      - **Example**: `"IOT-METER-X99"`
-  - `is_occupied` (Boolean)
-      - **Why**: Simple status check. Agar `True` hai, toh naya banda book nahi kar sakta.
-      - **Example**: `False` (Available)
-
-#### 2.3 Table: `PricingRule`
-
-**Description**: Seasonal pricing logic.
-**Fields**:
-
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Rules are per property.
-  - `rule_name` (String)
-      - **Why**: Identify the rule.
-      - **Example**: `"Summer Surge"`
-  - `start_month` (Integer)
-      - **Why**: When does it start (1-12).
-      - **Example**: `4` (April)
-  - `end_month` (Integer)
-      - **Why**: When does it end.
-      - **Example**: `6` (June)
-  - `price_multiplier` (Decimal)
-      - **Why (USP 4)**: Rent multiplier. 1.10 means 10% extra.
-      - **Example**: `1.10`
-
-#### 2.4 Table: `ElectricityReading`
-
-**Description**: IoT meter logs.
-**Fields**:
-
-  - `bed_id` (Foreign Key -> Bed)
-      - **Why**: Which bed consumed power.
-  - `meter_id` (String)
-      - **Why**: IoT Device ID.
-  - `reading_kwh` (Decimal)
-      - **Why**: Units consumed.
-      - **Example**: `12.5`
-  - `timestamp` (DateTime)
-      - **Why**: When was reading taken.
-
-#### 2.5 Table: `Asset`
-
-**Description**: Physical assets (AC, Geyser).
-**Fields**:
-
-  - `property_id` (Foreign Key -> Property)
-      - **Why**: Where is the asset.
-  - `room_id` (Foreign Key -> Room, Nullable)
-      - **Why**: Which room (if applicable).
-  - `name` (String)
-      - **Why**: What is it.
-      - **Example**: `"Voltas AC 1.5T"`
-  - `qr_code` (String)
-      - **Why**: Scan for history.
-  - `purchase_date` (Date)
-      - **Why**: Warranty tracking.
-  - `next_service_due_date` (Date)
-      - **Why**: Maintenance alerts.
-
-#### 2.6 Table: `AssetServiceLog`
-
-**Description**: Repair history.
-**Fields**:
-
-  - `asset_id` (Foreign Key -> Asset)
-      - **Why**: Which item fixed.
-  - `service_date` (Date)
-      - **Why**: When.
-  - `cost` (Decimal)
-      - **Why**: Expense tracking.
-  - `description` (Text)
-      - **Why**: What was done.
-      - **Example**: `"Gas filling"`
-  - `bill_photo` (Image)
-      - **Why**: Proof.
-
------
-
-## 👨‍🎓 MODULE 3: TENANT LIFECYCLE (App: `bookings`)
-
-### Purpose: Aana, Rehna aur Jaana
-
-Kaun, Kahan, aur Kab tak reh raha hai.
-
-#### 3.1 Table: `Booking`
-
-**Description**: Ye table user aur bed ko jodta hai.
-**Fields**:
-
-  - `tenant_id` (Foreign Key -\> User)
-      - **Why**: Kisne book kiya?
-  - `bed_id` (Foreign Key -\> Bed)
-      - **Why**: Kya book kiya?
-  - `payment_mode` (Enum)
-      - **Why (USP 8)**: **Zero Deposit Tracking**. Agar bande ne "Fintech Loan" chuna hai, toh hume deposit nahi mangna hai, balki loan company se lena hai.
-      - **Example**: `"FINTECH_LOAN"`
-  - `rent_amount` (Decimal)
-      - **Why**: Invoice generation ke liye monthly rent amount store karna zaroori hai.
-      - **Example**: `8000.00`
-  - `deposit_amount` (Decimal)
-      - **Why**: Security deposit ka amount track karne ke liye. Zero deposit mein ye 0 hoga.
-      - **Example**: `16000.00`
-  - `agreement_pdf` (File)
-      - **Why (USP 7)**: Sign kiya hua document proof ke liye store karna zaroori hai.
-      - **Example**: `agreements/rahul_signed.pdf`
-  - `notice_given_date` (Date)
-      - **Why (USP 9)**: Jab student app par "I am leaving" dabata hai, ye date save hoti hai. Iske basis par system calculate karega ki refund kab aur kitna dena hai.
-      - **Example**: `2025-11-18`
-  - `refund_amount` (Decimal, Nullable)
-      - **Why (USP 9)**: Auto-calculated refund amount. System calculate karega: Deposit - Outstanding Dues - Damage Charges = Refund.
-      - **Example**: `14500.00` (₹16000 deposit minus ₹1500 pending dues)
-  - `refund_processed_date` (Date, Nullable)
-      - **Why (USP 9)**: Kab refund process hua. Ye timestamp proof hai ki paisa wapas bhej diya gaya.
-      - **Example**: `2025-11-20`
-  - `is_zero_deposit` (Boolean)
-      - **Why (USP 8)**: Zero deposit option liya ya nahi. True means fintech loan liya, false means normal deposit diya.
-      - **Example**: `True` (Fintech loan liya)
-  - `fintech_partner_name` (String, Nullable)
-      - **Why (USP 8)**: Kaunsi company se loan liya (e.g., "PayLater Finance", "ZestMoney"). Integration tracking ke liye.
-      - **Example**: `"PayLater Finance"`
-  - `fintech_loan_id` (String, Nullable)
-      - **Why (USP 8)**: Loan company ka transaction/loan ID. Agar student payment nahi karta toh loan company ko contact karne ke liye.
-      - **Example**: `"LOAN-2025-X99876"`
-  - `status` (Enum)
-      - **Why**: Booking ka current status track karne ke liye. WAITING_FOR_LOAN_APPROVAL zero deposit feature ke liye zaroori hai.
-      - **Example**: `ACTIVE`
-      - **Choices**: ACTIVE, NOTICE_PERIOD, EXITED, CANCELLED
-
-#### 3.2 Table: `DigitalAgreement`
-
-**Description**: E-signed legal documents.
-**Fields**:
-
-  - `booking_id` (OneToOne -> Booking)
-      - **Why**: Link to specific stay.
-  - `agreement_file` (File)
-      - **Why (USP 7)**: The PDF file.
-  - `is_signed` (Boolean)
       - **Why**: Status check.
   - `signed_at` (DateTime)
       - **Why**: Timestamp of sign.

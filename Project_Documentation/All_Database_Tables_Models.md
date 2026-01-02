@@ -1260,6 +1260,7 @@ class PropertySubscription(models.Model):
     def __str__(self):
         return f"{self.owner.username} - {self.plan.name}"
 
+
 class AppVersion(models.Model):
     """
     Manages app versions for forced updates.
