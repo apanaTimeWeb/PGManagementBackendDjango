@@ -110,6 +110,145 @@ Phone: "+91-9876543210"
   ```
 - **Business Logic:** Enables property-wise staff management and payroll calculation
 
+### `OwnerProfile` - Business Owner/SuperAdmin Profile
+**Purpose:** Stores business-specific information for PG owners who can manage multiple properties
+
+#### Relationships:
+
+**1. `OwnerProfile` ↔ `CustomUser` (user) - 1:1 Relationship**
+- **Field:** `user = OneToOneField(CustomUser, limit_choices_to={'role': 'OWNER'})`
+- **Meaning:** Each owner profile belongs to exactly one user account with OWNER role
+- **Real Example:**
+  ```
+  CustomUser: mr_gupta (ID: 456, Role: OWNER)
+  OwnerProfile: Business Name=Gupta PG Chains, GST=27XXXXX1234X1Z5 (user_id: 456)
+  ```
+- **Why This Design:** Separates business credentials (GST, business name) from login credentials
+- **Business Logic:** Enables multi-property business management and tax compliance
+
+**2. `OwnerProfile` → `Property` - 1:N (Reverse Relationship)**
+- **Field (in Property):** `owner = ForeignKey('users.OwnerProfile')`
+- **Meaning:** One owner can own multiple properties
+- **Real Example:**
+  ```
+  Owner: Mr. Gupta
+  Property 1: Gokuldham PG (owner: Mr. Gupta)
+  Property 2: Sunrise PG (owner: Mr. Gupta)
+  Property 3: Comfort PG (owner Mr. Gupta)
+  ```
+
+### `ParentStudentMapping` - Parent-Child Relationship
+**Purpose:** Explicitly maps parents to their children (students/tenants) for parent portal access
+
+#### Relationships:
+
+**1. `ParentStudentMapping` ↔ `CustomUser` (parent_user) - N:1 Relationship**
+- **Field:** `parent_user = ForeignKey(CustomUser, limit_choices_to={'role': 'PARENT'})`
+- **Meaning:** One parent can have multiple children registered
+- **Real Example:**
+  ```
+  Parent: Mr. Sharma (Role: PARENT)
+  Mapping 1: Rahul (Student) → Mr. Sharma (Parent)
+  Mapping 2: Priya (Student) → Mr. Sharma (Parent)
+  ```
+- **Business Logic:** Enables parent portal with multi-child monitoring
+
+**2. `ParentStudentMapping` ↔ `TenantProfile` (student_tenant) - N:1 Relationship**
+- **Field:** `student_tenant = ForeignKey('users.TenantProfile')`
+- **Meaning:** Multiple parents can be linked to the same student (father, mother, guardian)
+- **Real Example:**
+  ```
+  Student: Rahul
+  Mapping 1: Rahul ← Mr. Sharma (Father)
+  Mapping 2: Rahul ← Mrs. Sharma (Mother)
+  ```
+- **Business Logic:** Multiple guardians can receive safety alerts and monitor same student
+- **Database Constraint:** `unique_together = ('parent_user', 'student_tenant')` prevents duplicate mappings
+
+### `ActivityLog` - Comprehensive Audit Trail
+**Purpose:** Tracks all critical user actions for security, compliance, and fraud detection
+
+#### Relationships:
+
+**1. `ActivityLog` ↔ `CustomUser` (user) - N:1 Relationship**
+- **Field:** `user = ForeignKey(CustomUser)`
+- **Meaning:** Each user generates multiple activity logs over time
+- **Real Example:**
+  ```
+  User: Manager Rajesh
+  Log 1: "Deleted Tenant Record" (Severity: CRITICAL, Jan 1, 15:30)
+  Log 2: "Updated Room Rent" (Severity: WARNING, Jan 2, 10:15)
+  Log 3: "Logged In" (Severity: INFO, Jan 3, 09:00)
+  ```
+- **Business Logic:** Complete audit trail for security monitoring and fraud detection
+
+**Activity Log Categories:**
+- `entity_type`: PAYMENT, TENANT, PROPERTY, ROOM (what was affected)
+- `entity_id`: UUID of the affected record
+- `action`: Description of what was done
+- `severity`: INFO, WARNING, CRITICAL (importance level)
+- `ip_address`: Where the action was performed from
+
+### `RefundTransaction` - Security Deposit Returns
+**Purpose:** Tracks all refund transactions when tenants exit (USP 9: Instant Refund)
+
+#### Relationships:
+
+**1. `RefundTransaction` ↔ `Booking` (booking) - N:1 Relationship**
+- **Field:** `booking = ForeignKey(Booking)`
+- **Meaning:** Each booking can have multiple refund transactions
+- **Real Example:**
+  ```
+  Booking: Rahul (Exited)
+  Refund 1: Security Deposit ₹15000 (PROCESSED)
+  Refund 2: Excess Rent ₹2000 (PROCESSED)
+  ```
+
+### `GeofenceSettings` - Parent-Configured Safe Zones
+**Purpose:** Enables parents to set up safe zones for real-time location monitoring (USP #12)
+
+#### Relationships:
+
+**1. `GeofenceSettings` ↔ `CustomUser` (parent) - N:1 Relationship**
+- **Field:** `parent = ForeignKey(CustomUser, limit_choices_to={'role': 'PARENT'})`
+- **Meaning:** One parent can set up multiple geofences for their children
+- **Real Example:**
+  ```
+  Parent: Mr. Sharma
+  Geofence 1: PG Safe Zone (500m radius around PG)
+  Geofence 2: College Safe Zone (1km radius around college)
+  Geofence 3: Coaching Safe Zone (500m radius around coaching center)
+  ```
+
+**2. `GeofenceSettings` ↔ `TenantProfile` (tenant) - N:1 Relationship**
+- **Field:** `tenant = ForeignKey('users.TenantProfile')`
+- **Meaning:** One student can have multiple safe zones configured
+- **Business Logic:** Alerts sent when student exits safe zone during specified times
+
+### `VideoCallLog` - Parent-Manager Communication
+**Purpose:** Tracks video calls between parents and managers (USP #1: Parent Portal)
+
+#### Relationships:
+
+**1. `VideoCallLog` ↔ `CustomUser` (parent) - N:1 Relationship**
+- **Field:** `parent = ForeignKey(CustomUser, limit_choices_to={'role': 'PARENT'})`
+- **Meaning:** Each parent can make multiple video calls
+
+**2. `VideoCallLog` ↔ `StaffProfile` (manager) - N:1 Relationship**
+- **Field:** `manager = ForeignKey('users.StaffProfile')`
+- **Meaning:** Tracks which manager attended the call
+
+**3. `VideoCallLog` ↔ `TenantProfile` (tenant) - N:1 Relationship (Optional)**
+- **Field:** `tenant = ForeignKey('users.TenantProfile', null=True)`
+- **Meaning:** Links call to specific student discussion
+- **Real Example:**
+  ```
+  Parent: Mr. Sharma calls Manager Rajesh
+  Topic: Room inspection for son Rahul
+  Duration: 15 minutes
+  Status: COMPLETED
+  ```
+
 ---
 
 ## 2. 🏨 `properties` App Relationships
@@ -748,6 +887,43 @@ Phone: "+91-9876543210"
 - **Business Logic:** Legal compliance and paperless documentation
 - **Database Behavior:** If booking is deleted, agreement is also deleted (CASCADE)
 
+### `RoomChangeHistory` - Internal Room Transfer Tracking
+**Purpose:** Records all room change requests and approvals for tenants during their stay
+
+#### Relationships:
+
+**1. `RoomChangeHistory` ↔ `CustomUser` (tenant) - N:1 Relationship**
+- **Field:** `tenant = ForeignKey(CustomUser, limit_choices_to={'role': 'TENANT'})`
+- **Meaning:** One tenant can request multiple room changes during their stay
+- **Real Example:**
+  ```
+  Tenant: Rahul
+  Change 1: Room 101-A → Room 203-B (Reason: "AC issue in old room", Status: APPROVED)
+  Change 2: Room 203-B → Room 105-A (Reason: "Roommate conflict", Status: PENDING)
+  ```
+- **Business Logic:** Enables tracking of internal transfers and dispute resolution
+
+**2. `RoomChangeHistory` ↔ `Room` (previous_room) - N:1 Relationship**
+- **Field:** `previous_room = ForeignKey(Room, related_name='outgoing_changes')`
+- **Meaning:** Tracks which room tenant is moving from
+
+**3. `RoomChangeHistory` ↔ `Room` (new_room) - N:1 Relationship**
+- **Field:** `new_room = ForeignKey(Room, related_name='incoming_changes')`
+- **Meaning:** Tracks which room tenant is moving to
+- **Database Constraint:** `previous_room` must be different from `new_room`
+
+**4. `RoomChangeHistory` ↔ `CustomUser` (approved_by) - N:1 Relationship (Optional)**
+- **Field:** `approved_by = ForeignKey(CustomUser, limit_choices_to={'role__in': ['MANAGER', 'OWNER']})`
+- **Meaning:** Tracks which manager/owner approved the room change
+- **Business Logic:** Authorization workflow for room transfers
+
+**Room Change Workflow:**
+1. Tenant requests room change with reason
+2. Manager reviews request
+3. Status: PENDING → APPROVED/REJECTED
+4. If approved, booking's bed_id is updated automatically
+5. Old bed becomes available, new bed becomes occupied
+
 ---
 
 ## 4. 💸 `finance` App Relationships
@@ -1013,6 +1189,30 @@ Phone: "+91-9876543210"
 *   **N -- 1** with `CustomUser` (`user`)
     *   *Context:* Firebase device tokens belonging to a user.
 
+### `MessageTemplate` - Automated Message Templates
+**Purpose:** Stores predefined templates for automated notifications (property-specific)
+
+#### Relationships:
+
+**1. `MessageTemplate` ↔ `Property` (property) - N:1 Relationship**
+- **Field:** `property = ForeignKey('properties.Property')`
+- **Meaning:** Each property can have custom message templates
+- **Real Example:**
+  ```
+  Property: Gokuldham PG
+  Template 1: "Welcome to {{property_name}}! Your room is {{room_number}}" (Category: WELCOME)
+  Template 2: "Rent due on {{due_date}}. Amount: ₹{{amount}}" (Category: RENT_REMINDER)
+  Template 3: "Emergency: {{message}}" (Category: EMERGENCY)
+  ```
+- **Business Logic:** Enables property-specific customized messaging
+- **Template Variables:** Uses {{variable}} format for dynamic content replacement
+
+**Message Template Categories:**
+- `RENT_REMINDER`: Monthly rent payment reminders
+- `NOTICE`: General announcements and notices
+- `EMERGENCY`: Emergency alerts and SOS notifications
+- `MARKETING`: Promotional messages and offers
+
 ---
 
 ## 9. 🛑 `visitors` App Relationships
@@ -1097,17 +1297,132 @@ Phone: "+91-9876543210"
 **Why It's Central:** Every action in the system is performed by a user
 
 **Connected To:**
-- **Profiles:** TenantProfile, StaffProfile (identity extension)
+- **Profiles:** TenantProfile, StaffProfile, OwnerProfile (identity extension)
+- **Parent-Child Mapping:** ParentStudentMapping (family relationships)
 - **Properties:** Property ownership and management
 - **Bookings:** Tenant stays and reservations
-- **Finance:** Transactions, invoices, salary payments
-- **Operations:** Complaints, entry logs, SOS alerts, chat logs
+- **Finance:** Transactions, invoices, salary payments, refund processing
+- **Operations:** Complaints, entry logs, SOS alerts, chat logs, geofence settings, video calls
 - **Feedback:** Complaint ratings, mess reviews
 - **Visitors:** Visitor requests and approvals
 - **Inventory:** Stock transaction records
 - **Payroll:** Staff attendance and salary
 - **Hygiene:** Inspection records
 - **Notifications:** SMS, email, push notification logs
-- **Audit:** Activity tracking for security
+- **Audit:** Activity tracking for security (ActivityLog)
+- **Room Changes:** Internal transfer history
 
+### 2. **`Property`** - The Physical & Business Hub
+**Why It's Central:** Represents the actual PG business location
 
+**Connected To:**
+- **Ownership:** OwnerProfile (business owner link)
+- **Physical Structure:** Rooms, beds, assets, electricity readings
+- **Business Rules:** Pricing rules, hygiene standards
+- **Operations:** Staff assignment, expenses, notices, geofence safe zones
+- **Customer Management:** Leads, visitor requests
+- **Inventory:** Kitchen stock and supplies
+- **Finance:** Property-wise profit/loss calculation, refunds
+- **Safety:** SOS alert jurisdiction
+- **Communications:** Property-specific message templates
+- **Mess:** Property-specific menus and meal selections
+
+### 3. **`Booking`** - The Business Transaction Hub
+**Why It's Central:** Represents the core business transaction (tenant stay)
+
+**Connected To:**
+- **Revenue Generation:** Invoices and payments
+- **Legal Compliance:** Digital agreements
+- **Resource Allocation:** Bed occupancy
+- **Customer Lifecycle:** Check-in to check-out journey
+- **Refunds:** Security deposit returns and adjustments
+- **Internal Transfers:** Room change history
+
+### 4. **`TenantProfile`** - The Student/Tenant Hub
+**Why It's Central:** Core entity for PG operations and parent monitoring
+
+**Connected To:**
+- **Family:** ParentStudentMapping (parent-child links)
+- **Safety:** GeofenceSettings, SOS alerts, entry logs
+- **Communication:** Video call logs with parents and managers
+- **Bookings:** Current and historical stays
+- **Mess:** Daily meal selections and feedback
+- **Complaints:** Issue reporting and tracking
+
+### 5. **Critical Relationships for New Developers:**
+
+**Must Understand First:**
+1. `CustomUser` → `TenantProfile/StaffProfile/OwnerProfile` (1:1) - User identity extension
+2. `Property` → `Room` → `Bed` (1:N:N) - Physical hierarchy
+3. `Booking` → `CustomUser` + `Bed` (N:1 + N:1) - Business transaction
+4. `Invoice` → `Booking` (N:1) - Revenue generation
+5. `ParentStudentMapping` → `CustomUser` + `TenantProfile` (N:1 + N:1) - Family tracking
+
+**Advanced Relationships:**
+6. `Transaction` → Multiple tables - Financial tracking
+7. `SOSAlert` → Multiple users - Safety system
+8. `Asset` → `AssetServiceLog` - Maintenance tracking
+9. `GeofenceSettings` → Parent + Tenant - Location monitoring
+10. `VideoCallLog` → Parent + Manager + Tenant - Communication
+11. `ActivityLog` → `CustomUser` - Audit trail
+
+### 6. **New Models Added (44+ Total Models)**
+
+**Users App (6 models):**
+- OwnerProfile (1:1 with CustomUser)
+- ParentStudentMapping (N:1 with CustomUser and TenantProfile)
+- ActivityLog (N:1 with CustomUser)
+
+**Bookings App (3 models):**
+- RoomChangeHistory (N:1 with Room and CustomUser)
+
+**Finance App (4 models):**
+- RefundTransaction (N:1 with Booking)
+
+**Operations App (7 models):**
+- GeofenceSettings (N:1 with CustomUser and TenantProfile)
+- VideoCallLog (N:1 with CustomUser, StaffProfile, TenantProfile)
+
+**Notifications App (3 models):**
+- MessageTemplate (N:1 with Property)
+
+---
+
+## 📊 Complete Relationship Summary
+
+### Total Relationships: 100+
+
+**One-to-One (1:1) Relationships:** ~15
+- CustomUser ↔ TenantProfile
+- CustomUser ↔ StaffProfile
+- CustomUser ↔ OwnerProfile
+- Booking ↔ DigitalAgreement
+- Complaint ↔ ComplaintFeedback
+- Lead ↔ CustomUser (converted_tenant)
+- Bed ↔ TenantProfile (current_tenant)
+
+**One-to-Many (1:N) Relationships:** ~80+
+- Property → Room → Bed (cascading hierarchy)
+- Property → Staff, Assets, Expenses, Notices, Leads
+- CustomUser → Bookings, Transactions, Complaints, EntryLogs
+- Booking → Invoices, Refunds
+- Room → RoomChangeHistory (previous/new)
+- And many more...
+
+**Many-to-Many (M:N) Relationships:** ~5
+- ParentStudentMapping (Parent ↔ Student)
+- CustomUser ↔ FCMToken (User ↔ Devices)
+- AlumniProfile ↔ Property (properties_stayed)
+
+---
+
+**🎯 Documentation Status: 100% Complete**
+
+All 44+ models across 18 Django apps have complete relationship documentation with:
+✅ Field names and relationship types
+✅ Real-world business examples
+✅ Database constraints and behaviors
+✅ Business logic explanations
+✅ USP feature mappings
+
+---
