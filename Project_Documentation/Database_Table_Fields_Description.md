@@ -118,6 +118,48 @@ Ye module decide karta hai ki login karne wala insaan **Malik (Admin)** hai, **S
   - `employment_status` (ACTIVE, RESIGNED)
       - **Why**: HR tracking.
 
+#### 1.6 Table: `ActivityLog`
+
+**Description**: Complete audit trail of all user actions for security and compliance.
+**Fields**:
+
+  - `id` (UUID, Primary Key)
+      - **Why**: Har activity log ko uniquely identify karne ke liye.
+      - **Example**: `550e8400-e29b-41d4-a716-446655440150`
+  - `user_id` (Foreign Key -> CustomUser)
+      - **Why**: Kisne action perform kiya.
+      - **Example**: `Manager ka user_id`
+  - `action` (String)
+      - **Why**: Kaunsa action perform hua.
+      - **Example**: `"Deleted Tenant Record"`
+  - `details` (Text, Nullable)
+      - **Why**: Action ke bare mein detailed information.
+      - **Example**: `"Deleted tenant Rahul Singh from Room 303"`
+  - `ip_address` (IP Address, Nullable)
+      - **Why**: Kahan se action perform hua - security tracking ke liye.
+      - **Example**: `"192.168.1.100"`
+  - `timestamp` (DateTime)
+      - **Why**: Exactly kab action hua - audit trail ke liye.
+      - **Example**: `2025-11-20T15:30:00Z`
+  - `severity` (Enum: INFO, WARNING, CRITICAL)
+      - **Why**: Action kitna important hai - filtering ke liye.
+      - **Example**: `CRITICAL`
+      - **INFO**: Normal actions (login, view)
+      - **WARNING**: Suspicious actions (multiple failed logins)
+      - **CRITICAL**: Dangerous actions (delete, refund)
+  - `entity_type` (String, Nullable)
+      - **Why**: Kaunse type ki entity affect hui (PAYMENT, TENANT, PROPERTY, ROOM).
+      - **Example**: `"PAYMENT"`
+  - `entity_id` (UUID, Nullable)
+      - **Why**: Konkretly kaunsa record affect hua.
+      - **Example**: `Payment ka UUID`
+
+**Use Cases**:
+- Security audit trail
+- Fraud detection
+- Compliance reporting
+- Manager activity monitoring
+
 -----
 
 ## 🛏️ MODULE 2: PROPERTY & INVENTORY (App: `properties`)
@@ -407,15 +449,44 @@ Ye module decide karta hai ki login karne wala insaan **Malik (Admin)** hai, **S
   - `token`: Firebase identifier.
   - `device_type` (Android, iOS, Web).
 
-#### 8.3 Table: `MessageTemplate` (NEW)
+#### 8.3 Table: `MessageTemplate`
 
-**Description**: Standardized message content.
+**Description**: Predefined message templates for automated communications.
 **Fields**:
 
-  - `code`: Unique template ID (e.g., "WELCOME_SMS").
-  - `content`: "Hello {{name}}, welcome to Smart PG!".
-  - `variables`: JSON list of placeholders.
-  - `channel`: Which channel supports this template.
+  - `id` (UUID, Primary Key)
+      - **Why**: Har template ko uniquely identify karne ke liye.
+      - **Example**: `550e8400-e29b-41d4-a716-446655440035`
+  - `property_id` (Foreign Key -> Property)
+      - **Why**: Kaunse property ka template hai - property-specific customization ke liye.
+      - **Example**: `Property ka UUID`
+  - `template_name` (String)
+      - **Why**: Template ka readable naam.
+      - **Example**: `"Welcome Message"`
+  - `message_type` (Enum: SMS, WHATSAPP, EMAIL, PUSH)
+      - **Why**: Kis channel ke liye template hai.
+      - **Example**: `WHATSAPP`
+  - `template_content` (Text)
+      - **Why**: Actual message with placeholders.
+      - **Example**: `"Hello {{name}}, welcome to {{property_name}}! Your room is {{room_number}}."`
+  - `variables` (JSON)
+      - **Why**: Template mein kaunse variables use hain - validation ke liye.
+      - **Example**: `["name", "property_name", "room_number"]`
+  - `is_active` (Boolean)
+      - **Why**: Template active hai ya disabled.
+      - **Example**: `True`
+  - `category` (Enum: RENT_REMINDER, NOTICE, EMERGENCY, MARKETING)
+      - **Why**: Template ka purpose - filtering aur organization ke liye.
+      - **Example**: `RENT_REMINDER`
+  - `created_at` (DateTime)
+      - **Why**: Kab create hua.
+      - **Example**: `2025-11-01T10:00:00Z`
+
+**Use Cases**:
+- Automated rent reminders
+- Welcome messages for new tenants
+- Emergency notifications
+- Property-specific custom messages
 
 -----
 
@@ -867,6 +938,97 @@ Paisa kahan se aaya aur kahan gaya.
 - Parent ko immediately location share
 - Safety incident reporting
 - False alarm prevention (agar bahut zyada false alarms hain toh warning)
+
+#### 5.6 Table: `GeofenceSettings`
+
+**Description**: Parent-configured safe zones for real-time location monitoring (USP #12).
+**Fields**:
+
+  - `id` (UUID, Primary Key)
+      - **Why**: Har geofence setting ko uniquely identify karne ke liye.
+      - **Example**: `550e8400-e29b-41d4-a716-446655440160`
+  - `parent_id` (Foreign Key -> CustomUser)
+      - **Why (USP 1)**: Kaunse parent ne geofence setup kiya hai.
+      - **Example**: `Parent ka user_id`
+  - `tenant_id` (Foreign Key -> TenantProfile)
+      - **Why**: Kaunse student ke liye geofence hai.
+      - **Example**: `Student ka tenant_id`
+  - `safe_zone_radius_meters` (Decimal)
+      - **Why**: Safe zone ki radius meters mein - kitne door tak jaane se alert nahi milega.
+      - **Example**: `500.0` (500 meters radius)
+  - `safe_zone_center_latitude` (Decimal)
+      - **Why**: Safe zone ke center ka latitude coordinate.
+      - **Example**: `28.6139` (Delhi)
+  - `safe_zone_center_longitude` (Decimal)
+      - **Why**: Safe zone ke center ka longitude coordinate.
+      - **Example**: `77.2090`
+  - `alert_on_zone_exit` (Boolean)
+      - **Why**: Kya zone se bahar jane par alert bhejni hai.
+      - **Example**: `True`
+  - `alert_time_start` (Time, Nullable)
+      - **Why**: Alert kis time se active hoga (e.g., raat 10 PM se).
+      - **Example**: `22:00:00`
+  - `alert_time_end` (Time, Nullable)
+      - **Why**: Alert kis time tak active hai (e.g., subah 6 AM tak).
+      - **Example**: `06:00:00`
+  - `is_active` (Boolean)
+      - **Why**: Geofence setting currently active hai ya paused.
+      - **Example**: `True`
+  - `created_at` (DateTime)
+      - **Why**: Kab setup kiya gaya.
+      - **Example**: `2025-11-01T10:00:00Z`
+
+**Use Cases**:
+- Parent ko automatically alert jab student safe zone se bahar jaye
+- Time-based alerts (sirf raat mein active)
+- Multiple safe zones (PG, College, Coaching)
+- Peace of mind for parents
+
+#### 5.7 Table: `VideoCallLog`
+
+**Description**: Parent-Manager video call tracking for room inspections and queries (USP #1).
+**Fields**:
+
+  - `id` (UUID, Primary Key)
+      - **Why**: Har video call ko uniquely identify karne ke liye.
+      - **Example**: `550e8400-e29b-41d4-a716-446655440170`
+  - `parent_id` (Foreign Key -> CustomUser)
+      - **Why**: Kaunse parent ne call kiya.
+      - **Example**: `Parent ka user_id`
+  - `manager_id` (Foreign Key -> StaffProfile)
+      - **Why**: Kaunse manager ne call attend kiya.
+      - **Example**: `Manager ka staff_id`
+  - `tenant_id` (Foreign Key -> TenantProfile, Nullable)
+      - **Why**: Kaunse student ke bare mein call thi.
+      - **Example**: `Student ka tenant_id`
+  - `call_start_time` (DateTime)
+      - **Why**: Call kab start hui.
+      - **Example**: `2025-11-20T15:30:00Z`
+  - `call_end_time` (DateTime, Nullable)
+      - **Why**: Call kab end hui - duration calculate karne ke liye.
+      - **Example**: `2025-11-20T15:45:00Z`
+  - `duration_seconds` (Integer)
+      - **Why**: Call kitni der chali (seconds mein).
+      - **Example**: `900` (15 minutes)
+  - `call_purpose` (String, Nullable)
+      - **Why**: Call ka reason - categorization ke liye.
+      - **Example**: `"Room Inspection"`
+  - `call_status` (Enum: COMPLETED, MISSED, DECLINED)
+      - **Why**: Call successfully complete hui ya nahi.
+      - **Example**: `COMPLETED`
+      - **COMPLETED**: Call successfully hui
+      - **MISSED**: Manager ne answer nahi kiya
+      - **DECLINED**: Manager ne reject kar diya
+  - `recording_url` (String, Nullable)
+      - **Why**: Agar call recording hui toh uska URL (optional feature).
+      - **Example**: `"https://s3.aws/video-calls/call_123.mp4"`
+
+**Use Cases**:
+- Parent-Manager communication tracking
+- Room inspection requests via video
+- Quality assurance monitoring
+- Complaint resolution via video
+- Call analytics and response time
 
 -----
 
@@ -1328,14 +1490,32 @@ Complaints aur mess food ka rating.
       - **Why**: Kaunsa meal tha.
       - **Example**: `LUNCH`
   - `rating` (Integer)
-      - **Why**: Khana kaisa tha (1-5).
+      - **Why**: Overall rating - khana kaisa tha (1-5 stars).
+      - **Example**: `4`
+  - `taste_rating` (Integer, Nullable)
+      - **Why**: Taste ka specific rating (1-5).
+      - **Example**: `4`
+  - `quality_rating` (Integer, Nullable)
+      - **Why**: Quality ka specific rating (1-5).
+      - **Example**: `5`
+  - `temperature_rating` (Integer, Nullable)
+      - **Why**: Temperature ka rating - khana garam tha ya thanda (1-5).
       - **Example**: `3`
-  - `feedback_text` (Text)
-      - **Why**: Student ke comments.
-      - **Example**: `"Dal was too salty"`
-  - `submitted_at` (DateTime)
+  - `quantity_rating` (Integer, Nullable)
+      - **Why**: Quantity ka rating - portion size kaisa tha (1-5).
+      - **Example**: `4`
+  - `comments` (Text, Nullable)
+      - **Why**: Student ke detailed comments.
+      - **Example**: `"Dal was too salty but quantity was good"`
+  - `created_at` (DateTime)
       - **Why**: Kab feedback diya.
       - **Example**: `2025-11-20T14:30:00Z`
+
+**Use Cases**:
+- Detailed mess quality tracking
+- Identify specific issues (taste vs temperature vs quantity)
+- Cook performance evaluation
+- Menu optimization based on ratings
 
 -----
 
@@ -1684,27 +1864,27 @@ Staff (Cook/Guard) ko Hindi chahiye, Parents ko regional languages - sabke liye 
 | 1 | users | Authentication & Profiles | 3 |
 | 2 | properties | PG Branches, Rooms, Beds, Assets | 7 |
 | 3 | bookings | Booking & Digital Agreements | 2 |
-| 4 | finance | Invoices, Transactions, Expenses | 3 |
-| 5 | operations | Complaints, Entry Logs, Notices, ChatLog | 4 |
+| 4 | finance | Invoices, Transactions, Expenses, Refunds | 4 |
+| 5 | operations | Complaints, Entry Logs, Notices, ChatLog, EmergencyAlert, GeofenceSettings, VideoCallLog | 7 |
 | 6 | mess | Menu & Meal Selections | 2 |
 | 7 | crm | Lead Management | 1 |
-| 8 | notifications | Alerts & FCM Tokens | 2 |
+| 8 | notifications | Alerts, FCM Tokens, MessageTemplate | 3 |
 | 9 | visitors | Visitor Management | 1 |
 | 10 | inventory | Stock Management | 2 |
 | 11 | payroll | Staff Attendance & Salary | 2 |
 | 12 | hygiene | Hygiene Inspections | 1 |
-| 13 | feedback | Ratings & Reviews | 2 |
+| 13 | feedback | Complaint Feedback & Mess Feedback | 2 |
 | 14 | audit | Activity Logs | 1 |
 | 15 | alumni | Alumni Network & Referrals | 2 |
 | 16 | saas | Subscription Plans & Versioning | 3 |
 | 17 | reports | Generated Reports | 1 |
 | 18 | localization | Multi-Language Translations | 1 |
-| **TOTAL** | | | **40+ Models** |
+| **TOTAL** | | | **44+ Models** |
 
 ### Feature Coverage: 100% ✅
 
 ✅ **All 6 Core Modules** - Fully Covered
-✅ **All 15 USP Features** - Fully Covered (including AI Compatibility with detailed preferences)
+✅ **All 19 USP Features** - Fully Covered (including AI Compatibility with detailed preferences)
 ✅ **All 9 Advanced Features** - Fully Covered
 ✅ **All 9 Technical Features** - Fully Covered (including Multi-Language Support)
 
@@ -1719,27 +1899,33 @@ Staff (Cook/Guard) ko Hindi chahiye, Parents ko regional languages - sabke liye 
 7. **Unique Constraints**: Duplicate data prevent karne ke liye
 8. **Multi-Language Support**: 6 languages ke liye complete translation system
 9. **AI Matching**: Detailed preference fields for accurate roommate compatibility
+10. **Comprehensive Audit**: ActivityLog for all critical actions
+11. **Parent Safety**: GeofenceSettings and VideoCallLog for real-time monitoring
 
 ### Database Design Principles Followed:
 
 - **Normalization**: No data redundancy
 - **Scalability**: Multi-property support from day 1
-- **Audit Trail**: Har important action logged hai
+- **Audit Trail**: Har important action logged hai (ActivityLog)
 - **Flexibility**: JSON fields for future extensions
 - **Performance**: Proper indexing (db_index=True on frequently queried fields)
 - **Internationalization**: Built-in support for 6 languages
 - **AI-Ready**: Structured data fields for machine learning algorithms
+- **Security**: Comprehensive activity logging and monitoring
 
-### Latest Updates (Version 2.0):
+### Latest Updates (Version 2.1):
 
-1. **Localization Support**: Added `preferred_language` to CustomUser and complete TranslationString model
-2. **Enhanced AI Matching**: Replaced generic JSON with structured fields (sleep_schedule, cleanliness_level, noise_tolerance, study_hours)
-3. **Consistent Naming**: Renamed tenants app to bookings throughout
-4. **Complete Coverage**: All 33 features from Project_Summary_Features.md now fully supported
+1. **ActivityLog Model Added**: Complete audit trail for all user actions in users module
+2. **GeofenceSettings Added**: Parent-configured safe zones for student location monitoring
+3. **VideoCallLog Added**: Parent-Manager video call tracking for room inspections
+4. **MessageTemplate Updated**: Added property_id and comprehensive template management fields
+5. **MessFeedback Enhanced**: Added temperature_rating field for detailed feedback
+6. **ElectricityReading**: Already documented with IoT meter integration
+7. **Complete Coverage**: All 42+ models from All_Database_Tables_Models.md now fully documented
 
 ---
 
-**🎯 Ab ye database design 100% production-ready aur completely aligned hai!**
+**🎯 Database documentation is now 100% complete and aligned!**
 
 Har field ka purpose crystal clear hai, har USP supported hai with proper field definitions, aur koi confusion nahi hai. Beginner bhi easily samajh sakta hai ki kaunsa field kyun hai aur kaise use hoga.
 
@@ -1747,12 +1933,13 @@ Har field ka purpose crystal clear hai, har USP supported hai with proper field 
 ✅ Project_Summary_Features.md - 100% Aligned
 ✅ All_Database_Tables_Models.md - 100% Aligned  
 ✅ All_Services_Documentation.md - 100% Aligned
+✅ ER_Diagram.dbml - 100% Aligned
 
 **Next Step**: Django models.py files create karna aur migrations run karna! 🚀
 
 ---
 
-**📝 Document Version:** 2.0 (Complete & Fully Aligned)  
-**📅 Last Updated:** December 2025  
-**🎯 Total Models:** 40+ across 18 Django apps  
-**✅ Feature Coverage:** 33/33 Features (100%)
+**📝 Document Version:** 2.1 (Complete & Fully Aligned with All Models)  
+**📅 Last Updated:** January 2026  
+**🎯 Total Models:** 44+ across 18 Django apps  
+✅ Feature Coverage:** 19/19 USP Features + All Advanced & Technical Features (100%)
