@@ -1,7 +1,6 @@
-# Init file for models to expose them to Django apps
-# This allows 'from apps.users.models import CustomUser'
-
-# We will import them here once the files are populated with content
-# from .custom_user import CustomUser
-# from .tenant_profile import TenantProfile
-# ...
+from .custom_user import CustomUser
+from .owner_profile import OwnerProfile
+from .tenant_profile import TenantProfile
+from .staff_profile import StaffProfile
+from .parent_student_mapping import ParentStudentMapping
+from .activity_log import ActivityLog
