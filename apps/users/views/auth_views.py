@@ -11,8 +11,11 @@ from apps.users.serializers.auth_serializers import UserRegistrationSerializer
 # Importing all the user-related models needed for profile creation and logging
 from apps.users.models import CustomUser, TenantProfile, StaffProfile, OwnerProfile, ActivityLog
 
+from rest_framework.permissions import AllowAny
+
 # Define RegisterView class handling User Registration logic
 class RegisterView(APIView):
+    permission_classes = [AllowAny]
     # Handle POST requests (creating new resources)
     def post(self, request):
         # Initialize serializer with the data sent in the request body
@@ -81,6 +84,7 @@ from django.core.cache import cache
 from datetime import datetime
 
 class LoginView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         # 1. Rate Limiting Check
         ip_address = request.META.get('REMOTE_ADDR')

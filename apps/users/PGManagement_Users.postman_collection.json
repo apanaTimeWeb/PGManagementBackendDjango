@@ -1,0 +1,125 @@
+{
+	"info": {
+		"_postman_id": "c7f9f3f9-7e5b-4b3d-8f1a-2e4b6c8d0e1f",
+		"name": "PG Management Users",
+		"description": "Collection for User Management Authentication endpoints.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{username}}\",\n    \"email\": \"{{email}}\",\n    \"phone_number\": \"{{phone}}\",\n    \"password\": \"{{password}}\",\n    \"confirm_password\": \"{{password}}\",\n    \"role\": \"{{role}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/register/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success) {",
+									"    pm.environment.set(\"access_token\", jsonData.access);",
+									"    pm.environment.set(\"refresh_token\", jsonData.refresh);",
+									"    pm.test(\"Tokens Saved\", function () {",
+									"        pm.expect(pm.environment.get(\"access_token\")).to.be.a('string');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{username}}\",\n    \"password\": \"{{password}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/login/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000",
+			"type": "string"
+		},
+		{
+			"key": "username",
+			"value": "rahul_sharma",
+			"type": "string"
+		},
+		{
+			"key": "email",
+			"value": "rahul@example.com",
+			"type": "string"
+		},
+		{
+			"key": "phone",
+			"value": "9876543210",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "Pass@123",
+			"type": "string"
+		},
+		{
+			"key": "role",
+			"value": "TENANT",
+			"type": "string"
+		}
+	]
+}
