@@ -153,7 +153,8 @@ class LoginView(APIView):
         refresh['role'] = user.role # Add custom claim
         
         # 7. Update Last Login
-        user.last_login = datetime.now()
+        from django.utils import timezone
+        user.last_login = timezone.now()
         user.save(update_fields=['last_login'])
 
         # 8. Log Activity
@@ -175,4 +176,89 @@ class LoginView(APIView):
                 "role": user.role
             }
         }, status=status.HTTP_200_OK)
+
+
+# --- Aadhaar Upload View ---
+from rest_framework.permissions import IsAuthenticated
+from apps.users.serializers.auth_serializers import AadhaarUploadSerializer
+from apps.users.utils import encrypt_aadhaar, generate_police_verification_pdf
+import uuid
+
+class AadhaarUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        
+        # 1. Role Check
+        if user.role != CustomUser.Roles.TENANT:
+             return Response(
+                {"success": False, "message": "Only tenants can upload Aadhaar."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        serializer = AadhaarUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+             
+        aadhaar_number = serializer.validated_data['aadhaar_number']
+        
+        # 2. Check Duplicates (In real world, need blind index or similar. For now, check if encrypted matches any?)
+        # Since encryption is randomized (IV) with Fernet, we can't search directly.
+        # For this demo, we'll skip global uniqueness check on ENCRYPTED field or assume we decrypt all (slow)
+        # OR we just rely on profile check.
+        
+        # Check if user already uploaded
+        try:
+            profile = user.tenant_profile
+        except TenantProfile.DoesNotExist:
+             return Response(
+                {"success": False, "message": "Tenant profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        if profile.aadhaar_number:
+             return Response(
+                {"success": False, "message": "Aadhaar already uploaded."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. Encrypt 
+        encrypted_aadhaar = encrypt_aadhaar(aadhaar_number)
+        
+        # 4. Mock S3 Upload (Images)
+        # We just generate a fake URL for now as we don't have AWS creds
+        fake_s3_url_front = f"https://s3.amazonaws.com/pg-management/aadhaar/{user.id}/front_{uuid.uuid4()}.jpg"
+        fake_s3_url_back = f"https://s3.amazonaws.com/pg-management/aadhaar/{user.id}/back_{uuid.uuid4()}.jpg"
+        
+        # 5. Generate Police Verification Form
+        pdf_path = generate_police_verification_pdf({
+            'username': user.username,
+            'full_name': user.get_full_name() or user.username,
+            'phone': user.phone_number,
+            'aadhaar_last_4': aadhaar_number[-4:],
+            'address': 'See attached ID proof'
+        })
+        
+        # 6. Update Profile
+        profile.aadhaar_number = encrypted_aadhaar
+        profile.aadhaar_url = f"{fake_s3_url_front},{fake_s3_url_back}" # Storing both as comma sep
+        profile.police_verification_status = 'SUBMITTED'
+        profile.save()
+        
+        # 7. Audit Log
+        ActivityLog.objects.create(
+            user=user,
+            action="AADHAAR_UPLOAD",
+            details="Aadhaar uploaded and police verification form generated.",
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        return Response({
+            "success": True,
+            "message": "Aadhaar uploaded and police verification triggered.",
+            "verification_status": "SUBMITTED",
+            "form_url": pdf_path # Sending local path for verification
+        }, status=status.HTTP_200_OK)
+
 

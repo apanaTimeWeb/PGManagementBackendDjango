@@ -40,3 +40,16 @@ class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)
     password = serializers.CharField(required=True, write_only=True)
 
+from apps.users.utils import validate_aadhaar_number
+
+class AadhaarUploadSerializer(serializers.Serializer):
+    aadhaar_number = serializers.CharField(max_length=12, required=True)
+    aadhaar_front_image = serializers.CharField(required=True, help_text="Base64 encoded string")
+    aadhaar_back_image = serializers.CharField(required=True, help_text="Base64 encoded string")
+
+    def validate_aadhaar_number(self, value):
+        if not validate_aadhaar_number(value):
+            raise serializers.ValidationError("Invalid Aadhaar number format. Must be 12 digits, cannot start with 0 or 1.")
+        return value
+
+

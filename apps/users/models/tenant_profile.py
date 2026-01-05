@@ -16,7 +16,7 @@ class TenantProfile(models.Model):
     bed = models.ForeignKey('properties.Bed', on_delete=models.SET_NULL, null=True, blank=True)
     
     # KYC Details (USP #2)
-    aadhaar_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    aadhaar_number = models.CharField(max_length=255, unique=True, null=True, blank=True)  # Stores encrypted Aadhaar (Fernet produces ~200 chars)
     aadhaar_url = models.TextField(null=True, blank=True)
     id_proof_type = models.CharField(max_length=50, choices=[('AADHAR', 'Aadhar'), ('PAN', 'PAN'), ('PASSPORT', 'Passport'), ('DRIVING_LICENSE', 'Driving License')], null=True, blank=True)
     id_proof_url = models.TextField(null=True, blank=True)
