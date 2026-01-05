@@ -68,5 +68,107 @@ class RegisterView(APIView):
                 # If any unexpected error occurs during the transaction, return 400 Bad Request
                 return Response({"success": False, "message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
+
         # If serializer validation fails (e.g., duplicate email), return the errors with 400 Bad Request
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# --- Login View Implementation ---
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from apps.users.serializers.auth_serializers import LoginSerializer
+from django.db.models import Q
+from django.core.cache import cache
+from datetime import datetime
+
+class LoginView(APIView):
+    def post(self, request):
+        # 1. Rate Limiting Check
+        ip_address = request.META.get('REMOTE_ADDR')
+        lockout_key = f"login_lockout_{ip_address}"
+        attempts_key = f"login_attempts_{ip_address}"
+
+        if cache.get(lockout_key):
+             return Response(
+                {"success": False, "message": "Account locked due to too many failed attempts. Try again in 30 minutes."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        username_input = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+
+        # 2. Resolve User (Username/Email/Phone)
+        user = None
+        try:
+            user = CustomUser.objects.get(
+                Q(username=username_input) | 
+                Q(email=username_input) | 
+                Q(phone_number=username_input)
+            )
+        except CustomUser.DoesNotExist:
+            pass # User will remain None, authentication will fail below
+
+        # 3. Authenticate
+        # We need to pass the actual username to authenticate if we found the user
+        if user:
+            user = authenticate(username=user.username, password=password)
+
+        if user is None:
+            # Increment failed attempts
+            attempts = cache.get(attempts_key, 0) + 1
+            cache.set(attempts_key, attempts, 900) # 15 minutes window
+
+            if attempts >= 5:
+                cache.set(lockout_key, True, 1800) # Lock for 30 minutes
+                return Response(
+                    {"success": False, "message": "Too many failed attempts. Account locked for 30 minutes."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
+            return Response(
+                {"success": False, "message": "Invalid credentials"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # 4. Check Active/Blocked Status
+        if not user.is_active:
+             return Response(
+                {"success": False, "message": "Account is disabled."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 5. Reset Failed Attempts on Success
+        cache.delete(attempts_key)
+        cache.delete(lockout_key)
+
+        # 6. Generate Tokens
+        refresh = RefreshToken.for_user(user)
+        refresh['role'] = user.role # Add custom claim
+        
+        # 7. Update Last Login
+        user.last_login = datetime.now()
+        user.save(update_fields=['last_login'])
+
+        # 8. Log Activity
+        ActivityLog.objects.create(
+            user=user,
+            action="USER_LOGIN",
+            details=f"User {user.username} logged in successfully",
+            ip_address=ip_address
+        )
+
+        # 9. Response
+        return Response({
+            "success": True,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": {
+                "id": str(user.id),
+                "username": user.username,
+                "role": user.role
+            }
+        }, status=status.HTTP_200_OK)
+

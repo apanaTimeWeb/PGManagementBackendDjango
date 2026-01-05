@@ -35,3 +35,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         
         # Return the created user instance
         return user
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+
