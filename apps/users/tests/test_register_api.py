@@ -21,8 +21,7 @@ class TestRegisterAPI:
             "role": "TENANT"
         }
 
-            "role": "TENANT"
-        }
+
         # Ensure clean state before starting any test
         self.cleanup_user()
 
